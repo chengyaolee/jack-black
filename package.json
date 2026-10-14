@@ -1,0 +1,21 @@
+{
+  "name": "jack-black",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Lightweight browser-based Vegas Blackjack game with Hi-Lo card counting trainer and AI simulation",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx --yes serve . -l 3000",
+    "dev": "npx --yes serve . -l 3000"
+  },
+  "keywords": [
+    "blackjack",
+    "card-counting",
+    "hi-lo",
+    "casino",
+    "vegas-rules",
+    "ai-simulation"
+  ],
+  "author": "",
+  "license": "MIT"
+}

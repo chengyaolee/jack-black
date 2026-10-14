@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jack Black - Vegas Card Counting Trainer & Casino Simulator</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            felt: {
+              DEFAULT: '#064e3b',
+              dark: '#022c22',
+              light: '#059669',
+              gold: '#fbbf24'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur sticky top-0 z-40 px-4 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand Logo & Tagline -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 text-xl font-black">
+          ♠
+        </div>
+        <div>
+          <h1 class="text-lg font-black tracking-wider uppercase font-casino text-amber-400 leading-none">
+            Jack Black
+          </h1>
+          <p class="text-[10px] text-slate-400 font-medium tracking-wide">
+            Vegas Card Counting Trainer & AI Table
+          </p>
+        </div>
+      </div>
+
+      <!-- Mode Switcher Tabs -->
+      <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner">
+        <button id="tab-game" class="px-4 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white shadow-md transition flex items-center gap-1.5">
+          <span>🎰</span>
+          <span>Vegas Table</span>
+        </button>
+        <button id="tab-practice" class="px-4 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+          <span>⚡</span>
+          <span>Speed Drill</span>
+        </button>
+      </div>
+
+      <!-- Shoe Progress Indicator & Cut-Card Marker -->
+      <div class="hidden sm:flex items-center gap-3 bg-slate-950/70 px-3 py-1.5 rounded-xl border border-slate-800/80 text-xs">
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between gap-3 text-[10px] font-mono text-slate-400">
+            <span>Shoe: <strong id="shoe-cards-left" class="text-slate-200">312 / 312</strong></span>
+            <span id="shoe-decks-left" class="text-amber-400/90 font-bold">~6.0 decks</span>
+          </div>
+          <!-- Penetration progress bar with cut card at 75% -->
+          <div class="w-36 h-2 bg-slate-800 rounded-full overflow-hidden relative mt-1 border border-slate-700">
+            <div id="shoe-penetration-fill" class="h-full bg-amber-400 rounded-full transition-all duration-300" style="width: 0%"></div>
+            <!-- 75% Cut Card line indicator -->
+            <div class="absolute top-0 bottom-0 left-[75%] w-0.5 bg-rose-500 shadow-sm" title="Cut Card (Reshuffle point at 75%)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Learning Toolbars & Action Modals -->
+      <div class="flex items-center gap-2">
+        <!-- Toggle: Betting Advisor -->
+        <button id="btn-toggle-bet-hints" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 border bg-emerald-500/20 text-emerald-300 border-emerald-500" title="Toggle Betting Sizing Advisor">
+          <span>💡</span>
+          <span class="hidden md:inline">Bet Hints</span>
+        </button>
+
+        <!-- Toggle: Strategy Advisor -->
+        <button id="btn-toggle-strat-hints" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 border bg-indigo-500/20 text-indigo-300 border-indigo-500" title="Toggle Basic Strategy & Deviations Advisor">
+          <span>🎯</span>
+          <span class="hidden md:inline">Strategy Hints</span>
+        </button>
+
+        <!-- Toggle: Live Count Peek Drawer -->
+        <button id="btn-toggle-peek" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 border bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200" title="Peek or Pin Live Hi-Lo Count">
+          <span>👁️</span>
+          <span class="hidden md:inline">Peek Count</span>
+        </button>
+
+        <div class="h-4 w-[1px] bg-slate-700 mx-1 hidden sm:block"></div>
+
+        <!-- Strategy Matrix Modal Button -->
+        <button id="btn-open-strategy" class="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 text-xs transition border border-slate-700" title="Open Basic Strategy Chart">
+          📖
+        </button>
+
+        <!-- Counting Guide Modal Button -->
+        <button id="btn-open-guide" class="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 text-xs transition border border-slate-700" title="How to Count Cards Guide">
+          🎓
+        </button>
+
+        <!-- Sound Toggle Button -->
+        <button id="btn-toggle-sound" class="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 text-xs transition border border-slate-700" title="Toggle Audio Sound Effects">
+          🔊
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main View Stage -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 flex flex-col justify-between relative">
+
+    <!-- ========================================== -->
+    <!-- MODE 2: VEGAS TABLE & AI SIMULATION VIEW   -->
+    <!-- ========================================== -->
+    <div id="game-mode-view" class="flex-1 flex flex-col justify-between">
+      
+      <!-- Table Controls Bar: Seat Selector & AI Delta Slider -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 mb-3 flex flex-wrap items-center justify-between gap-4 text-xs">
+        
+        <!-- Table Seats Selector -->
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 font-medium">Table Seats:</span>
+          <div class="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+            <button class="btn-seat-count px-2.5 py-1 rounded text-xs transition font-semibold" data-seats="1">1</button>
+            <button class="btn-seat-count px-2.5 py-1 rounded text-xs transition font-semibold" data-seats="2">2</button>
+            <button class="btn-seat-count px-2.5 py-1 rounded text-xs transition font-bold bg-amber-500 text-slate-950" data-seats="3">3</button>
+            <button class="btn-seat-count px-2.5 py-1 rounded text-xs transition font-semibold" data-seats="4">4</button>
+            <button class="btn-seat-count px-2.5 py-1 rounded text-xs transition font-semibold" data-seats="5">5</button>
+          </div>
+        </div>
+
+        <!-- AI Chaos Delta Parameter Slider -->
+        <div class="flex items-center gap-3 flex-1 max-w-md min-w-[240px]">
+          <div class="flex flex-col flex-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-amber-400 flex items-center gap-1.5">
+                <span>🤖 AI Chaos Parameter:</span>
+                <span id="label-ai-delta" class="font-mono text-emerald-400">Δ = 0.00</span>
+              </span>
+              <span id="desc-ai-delta" class="text-[10px] text-slate-400 truncate">GTO Basic Strategy Master</span>
+            </div>
+            <input id="slider-ai-delta" type="range" min="0" max="1" step="0.05" value="0.0" class="w-full accent-amber-400 h-1.5 bg-slate-700 rounded-lg cursor-pointer mt-1">
+          </div>
+        </div>
+
+        <!-- Vegas Casino Rules Stamp Tag -->
+        <div class="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>Vegas 6-Deck • S17 • Blackjack 3:2 • DAS</span>
+        </div>
+
+      </div>
+
+      <!-- Vegas Casino Table Felt Felt Area -->
+      <div class="casino-felt felt-subtle-pattern rounded-3xl p-4 sm:p-6 flex-1 flex flex-col justify-between relative min-h-[460px] md:min-h-[500px]">
+        
+        <!-- Table Felt Decorative Arcs -->
+        <div class="absolute inset-x-8 top-16 h-28 border-b-2 border-amber-400/20 rounded-b-[180px] pointer-events-none"></div>
+
+        <!-- Dealer Section -->
+        <div class="flex flex-col items-center justify-center relative z-10">
+          
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-casino font-bold text-amber-300 text-xs tracking-widest uppercase">Dealer</span>
+            <div id="dealer-score-badge" class="hidden px-2.5 py-0.5 rounded-full bg-slate-900/90 border border-amber-400/40 text-amber-300 font-mono font-bold text-xs shadow-md">
+              -
+            </div>
+          </div>
+
+          <!-- Dealer Cards Container -->
+          <div id="dealer-cards" class="flex gap-2 justify-center items-center min-h-[114px] md:min-h-[138px]">
+            <!-- Dealer cards rendered here -->
+          </div>
+
+          <!-- Dealer Rules Felt Inscription -->
+          <div class="insurance-banner px-4 py-1 mt-3 bg-black/20 text-center select-none text-[10px] sm:text-xs">
+            Blackjack Pays 3 to 2 • Dealer Must Stand on All 17s • Insurance Pays 2 to 1
+          </div>
+
+        </div>
+
+        <!-- Seats Arc Section (1 to 5 players) -->
+        <div id="table-seats" class="flex flex-nowrap md:flex-wrap overflow-x-auto pb-3 justify-start md:justify-around items-end gap-3 sm:gap-4 mt-4 relative z-10 w-full">
+          <!-- Dynamic seat cards, chips, and tags rendered here -->
+        </div>
+
+      </div>
+
+      <!-- Bottom Interactive HUD / Action Bar -->
+      <div class="mt-3">
+
+        <!-- Betting Size Advisor Coach Banner (Dynamic tooltip before deal) -->
+        <div id="betting-advisor-banner" class="hidden p-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 flex items-center justify-between gap-4 text-emerald-200 text-sm mb-3 shadow-lg">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">💡</span>
+            <div>
+              <div id="betting-advisor-text" class="font-bold">Evaluating count...</div>
+              <div id="betting-advisor-subtext" class="text-xs text-slate-300">Ramp recommendations appear here</div>
+            </div>
+          </div>
+          <button id="btn-apply-recommended-bet" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow shrink-0">
+            Apply Bet
+          </button>
+        </div>
+
+        <!-- Strategy Advisor Floating Hint Banner (During Player Turn) -->
+        <div id="strategy-advisor-banner" class="hidden p-3 rounded-xl border border-amber-400 bg-amber-950/60 flex items-center justify-between gap-4 text-amber-200 text-sm mb-3 shadow-lg shadow-amber-500/20">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🎯</span>
+            <div>
+              <div id="strategy-advisor-text" class="font-black tracking-wide text-amber-300 uppercase">Optimal Move: HIT</div>
+              <div id="strategy-advisor-reason" class="text-xs text-amber-100/90">Based on Vegas Basic Strategy + Illustrious 18 Deviations</div>
+            </div>
+          </div>
+          <span class="text-[10px] bg-amber-400/20 px-2 py-1 rounded text-amber-300 font-mono font-bold">Hint Active</span>
+        </div>
+
+        <!-- 1. Betting Controls Bar (Shown during BETTING phase) -->
+        <div id="betting-controls-bar" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+          
+          <!-- Chips Selector -->
+          <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span class="text-xs text-slate-400 font-medium">Chips:</span>
+            <button class="casino-chip chip-5" data-value="5" title="Add $5">$5</button>
+            <button class="casino-chip chip-10" data-value="10" title="Add $10">$10</button>
+            <button class="casino-chip chip-25" data-value="25" title="Add $25">$25</button>
+            <button class="casino-chip chip-50" data-value="50" title="Add $50">$50</button>
+            <button class="casino-chip chip-100" data-value="100" title="Add $100">$100</button>
+            <button class="casino-chip chip-500" data-value="500" title="Add $500">$500</button>
+          </div>
+
+          <!-- Current Bet & Actions -->
+          <div class="flex items-center gap-3 flex-wrap">
+            <div class="bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-right">
+              <div class="text-[10px] text-slate-400 uppercase font-bold">Your Bet</div>
+              <div id="user-current-bet-display" class="font-mono font-extrabold text-amber-400 text-base leading-none">$10</div>
+            </div>
+
+            <button id="btn-clear-bet" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700">
+              Clear
+            </button>
+            <button id="btn-double-bet" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700">
+              2x Bet
+            </button>
+            <button id="btn-deal-cards" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm transition shadow-lg shadow-emerald-600/30 flex items-center gap-2">
+              <span>DEAL</span>
+              <kbd class="text-[10px] bg-emerald-800/60 px-1.5 py-0.5 rounded font-mono font-normal">Space</kbd>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- 2. Action Controls Bar (Shown during PLAYING phase) -->
+        <div id="playing-controls-bar" class="hidden bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-center gap-3 sm:gap-4 shadow-xl">
+          
+          <button id="btn-action-hit" class="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm tracking-wide transition shadow-lg flex items-center gap-2 border-2 border-transparent">
+            <span>HIT</span>
+            <kbd class="text-[10px] bg-black/30 px-1.5 py-0.5 rounded font-mono">H</kbd>
+          </button>
+
+          <button id="btn-action-stand" class="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm tracking-wide transition shadow-lg flex items-center gap-2 border-2 border-transparent">
+            <span>STAND</span>
+            <kbd class="text-[10px] bg-black/30 px-1.5 py-0.5 rounded font-mono">S</kbd>
+          </button>
+
+          <button id="btn-action-double" class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm tracking-wide transition shadow-lg flex items-center gap-2 border-2 border-transparent disabled:opacity-30 disabled:cursor-not-allowed">
+            <span>DOUBLE</span>
+            <kbd class="text-[10px] bg-black/30 px-1.5 py-0.5 rounded font-mono">D</kbd>
+          </button>
+
+          <button id="btn-action-split" class="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-sm tracking-wide transition shadow-lg flex items-center gap-2 border-2 border-transparent disabled:opacity-30 disabled:cursor-not-allowed">
+            <span>SPLIT</span>
+            <kbd class="text-[10px] bg-black/30 px-1.5 py-0.5 rounded font-mono">P</kbd>
+          </button>
+
+        </div>
+
+        <!-- 3. Round Over Bar -->
+        <div id="round-over-bar" class="hidden bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex items-center justify-center shadow-xl">
+          <button id="btn-new-round" class="px-8 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm tracking-wider transition shadow-lg shadow-amber-500/20 flex items-center gap-2 uppercase">
+            <span>Next Hand</span>
+            <kbd class="text-[10px] bg-black/20 px-1.5 py-0.5 rounded font-mono">Space</kbd>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODE 1: SPEED COUNTING DRILL VIEW          -->
+    <!-- ========================================== -->
+    <div id="practice-mode-view" class="hidden flex-1 flex flex-col justify-between">
+      
+      <!-- Drill Setup Bar -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 mb-3 flex flex-wrap items-center justify-between gap-4 text-xs">
+        
+        <!-- Speed Setting Presets & Slider -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-slate-400 font-medium">Speed:</span>
+          <div class="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+            <button class="btn-speed-preset px-2.5 py-1 rounded text-xs transition" data-speed="1500">Beginner (1.5s)</button>
+            <button class="btn-speed-preset px-2.5 py-1 rounded text-xs transition bg-emerald-600 text-white font-bold" data-speed="800">Dealer (0.8s)</button>
+            <button class="btn-speed-preset px-2.5 py-1 rounded text-xs transition" data-speed="350">Speed Demon (0.35s)</button>
+          </div>
+          <div class="flex items-center gap-1.5 ml-2">
+            <input id="practice-speed-slider" type="range" min="200" max="2000" step="50" value="800" class="w-24 accent-emerald-500 h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+            <span id="practice-speed-label" class="font-mono text-slate-300">0.80s</span>
+          </div>
+        </div>
+
+        <!-- Display Style (Single, Pair, Triple) -->
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 font-medium">Deal Style:</span>
+          <div class="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+            <button class="btn-display-style px-2.5 py-1 rounded text-xs transition bg-emerald-600 text-white font-bold" data-style="single">Single</button>
+            <button class="btn-display-style px-2.5 py-1 rounded text-xs transition" data-style="pair">Pairs</button>
+            <button class="btn-display-style px-2.5 py-1 rounded text-xs transition" data-style="triple">Triplets</button>
+          </div>
+        </div>
+
+        <!-- Cards per Check-in Dropdown & Continuous Shoe -->
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400">Batch Size:</span>
+            <select id="select-cards-per-round" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200">
+              <option value="5">5 cards</option>
+              <option value="10" selected>10 cards</option>
+              <option value="15">15 cards</option>
+              <option value="20">20 cards</option>
+            </select>
+          </div>
+
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input id="practice-continuous-toggle" type="checkbox" class="accent-emerald-500 rounded">
+            <span>Continuous Shoe</span>
+          </label>
+
+          <button id="btn-start-practice" class="px-5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs transition shadow-lg shadow-emerald-600/20">
+            START DRILL
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Practice Arena Felt Stage -->
+      <div class="casino-felt felt-subtle-pattern rounded-3xl p-6 flex-1 flex flex-col justify-center items-center relative min-h-[460px]">
+        
+        <!-- Live Progress Pill -->
+        <div id="practice-progress-pill" class="absolute top-6 px-4 py-1.5 rounded-full bg-black/60 border border-white/20 text-xs font-mono font-bold text-amber-300">
+          Ready to Start Drill
+        </div>
+
+        <!-- Card Stage Area (Center Stage for Flashing Cards) -->
+        <div id="practice-card-stage" class="flex items-center justify-center min-h-[160px] my-6">
+          <div class="text-slate-400 text-sm italic text-center">
+            Click <strong class="text-emerald-400">START DRILL</strong> to test your speed!<br>
+            Cards will flash at your chosen speed. Count in your head (+1, 0, -1).
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- LIVE COUNT PEEK DRAWER (Toggle 3)          -->
+    <!-- ========================================== -->
+    <div id="live-count-peek-drawer" class="fixed bottom-4 right-4 bg-slate-900/95 border border-slate-700/80 rounded-2xl p-3.5 shadow-2xl backdrop-blur z-30 transition-all duration-300 opacity-40 translate-y-2 max-w-[280px]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+        <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+          <span>👁️</span> Live Count Peek
+        </span>
+        <span class="text-[10px] text-slate-400 font-mono">Hi-Lo System</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-center">
+        <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+          <div class="text-[10px] text-slate-400 font-semibold">Running Count</div>
+          <div id="peek-running-count" class="font-mono-numbers text-xl font-black text-slate-200">0</div>
+        </div>
+        <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+          <div class="text-[10px] text-slate-400 font-semibold">True Count</div>
+          <div id="peek-true-count" class="font-mono-numbers text-xl font-black text-slate-200">0.0</div>
+        </div>
+      </div>
+      <div class="mt-2 text-[10px] text-slate-400 text-center font-mono" id="peek-penetration-text">
+        0% Penetration (Cut at 75%)
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODALS & OVERLAYS                          -->
+  <!-- ========================================== -->
+
+  <!-- Practice Question Numpad Modal -->
+  <div id="practice-question-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-card-deal">
+      <div class="text-center mb-4">
+        <h3 class="text-lg font-black text-amber-400 font-casino uppercase">Pause & Check-in</h3>
+        <p class="text-xs text-slate-300">What is the Running Count?</p>
+      </div>
+
+      <!-- Current Input Value Box -->
+      <div class="bg-slate-950 border-2 border-amber-400/50 rounded-2xl p-4 text-center mb-5 shadow-inner">
+        <span id="practice-input-display" class="font-mono-numbers text-4xl font-black text-white">0</span>
+      </div>
+
+      <!-- Keypad -->
+      <div class="grid grid-cols-3 gap-2 text-base font-mono font-bold">
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="1">1</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="2">2</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="3">3</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="4">4</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="5">5</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="6">6</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="7">7</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="8">8</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition" data-key="9">9</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 transition" data-key="sign">+/-</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 transition" data-key="0">0</button>
+        <button class="practice-key p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 transition" data-key="clear">CLR</button>
+      </div>
+
+      <button class="practice-key w-full mt-3 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm tracking-wide transition shadow-lg shadow-emerald-500/20" data-key="submit">
+        SUBMIT COUNT (Enter)
+      </button>
+    </div>
+  </div>
+
+  <!-- Practice Round Feedback Modal -->
+  <div id="practice-feedback-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl animate-card-deal">
+      <div class="text-center mb-4">
+        <div id="feedback-title" class="text-2xl font-black text-emerald-400">PERFECT!</div>
+        <div class="flex items-center justify-center gap-6 my-3">
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400 uppercase font-bold">Your Guess</div>
+            <div id="feedback-user-guess" class="font-mono text-2xl font-black text-amber-400">+2</div>
+          </div>
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400 uppercase font-bold">Actual Count</div>
+            <div id="feedback-actual-count" class="font-mono text-2xl font-black text-emerald-400">+2</div>
+          </div>
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400 uppercase font-bold">Response Speed</div>
+            <div id="feedback-time" class="font-mono text-2xl font-bold text-slate-200">1.2s</div>
+          </div>
+          <div class="text-center">
+            <div class="text-[10px] text-slate-400 uppercase font-bold">Score</div>
+            <div id="feedback-score" class="font-mono text-2xl font-black text-purple-400">+100</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Batch Cards Timeline Breakdown Tray -->
+      <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4">
+        <div class="text-[10px] text-slate-400 font-semibold mb-2 uppercase tracking-wide">Dealt Cards Breakdown (+1 / 0 / -1):</div>
+        <div id="feedback-cards-tray" class="flex gap-2 overflow-x-auto pb-2 justify-center flex-wrap">
+          <!-- Mini cards with +1/0/-1 pills rendered here -->
+        </div>
+        <div id="feedback-math-breakdown" class="text-xs font-mono text-center text-slate-300 mt-2 border-t border-slate-800 pt-2">
+          <!-- Step by step math string -->
+        </div>
+      </div>
+
+      <button id="btn-feedback-next-round" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm transition shadow-lg">
+        CONTINUE TO NEXT ROUND
+      </button>
+    </div>
+  </div>
+
+  <!-- Practice Session Summary Modal -->
+  <div id="practice-summary-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl text-center">
+      <div class="text-4xl mb-2">🏆</div>
+      <h3 class="text-2xl font-black text-amber-400 font-casino uppercase">Drill Complete!</h3>
+      <div id="summary-rank-title" class="text-xl font-black text-emerald-400 my-1">Vegas Pit Boss Nightmare</div>
+      <p class="text-xs text-slate-400 mb-5">Here is your performance report:</p>
+
+      <div class="grid grid-cols-2 gap-3 mb-6 font-mono">
+        <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+          <div class="text-[10px] text-slate-400 uppercase">Accuracy</div>
+          <div id="summary-accuracy" class="text-2xl font-black text-emerald-400">100%</div>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+          <div class="text-[10px] text-slate-400 uppercase">Total Score</div>
+          <div id="summary-total-score" class="text-2xl font-black text-amber-400">550</div>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+          <div class="text-[10px] text-slate-400 uppercase">Correct Rounds</div>
+          <div id="summary-correct-rounds" class="text-xl font-bold text-slate-200">5 / 5</div>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+          <div class="text-[10px] text-slate-400 uppercase">Avg Response Time</div>
+          <div id="summary-avg-speed" class="text-xl font-bold text-slate-200">0.95s</div>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="btn-summary-play-again" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition border border-slate-700">
+          Drill Again
+        </button>
+        <button id="btn-summary-go-game" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-white font-bold text-xs transition shadow-lg">
+          Go to Vegas Table
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Insurance Decision Prompt Modal -->
+  <div id="insurance-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-amber-500/50 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center">
+      <div class="text-3xl mb-2">🛡️</div>
+      <h3 class="text-lg font-black text-amber-400 font-casino uppercase">Insurance Offered</h3>
+      <p class="text-xs text-slate-300 mt-1 mb-2">
+        Dealer shows an Ace. Protect your hand against Blackjack? Pays 2:1.
+      </p>
+      <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 mb-3 text-xs">
+        <div class="text-slate-400">Insurance Cost: <strong id="insurance-cost-display" class="text-amber-400">$5</strong></div>
+        <div id="insurance-advisor-text" class="text-xs text-slate-300 mt-1">Evaluating True Count...</div>
+      </div>
+      <div class="flex gap-3">
+        <button id="btn-insurance-yes" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow">
+          Take Insurance
+        </button>
+        <button id="btn-insurance-no" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition border border-slate-700">
+          Decline
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Strategy Matrix Cheat Sheet Modal -->
+  <div id="strategy-matrix-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <div>
+          <h3 class="text-xl font-black text-amber-400 font-casino uppercase">Vegas Basic Strategy Matrix</h3>
+          <p class="text-xs text-slate-400">6-Deck Shoe • Dealer Stands on Soft 17 (S17) • Double After Split (DAS)</p>
+        </div>
+        <button id="btn-close-strategy" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+          ✕
+        </button>
+      </div>
+      <div id="strategy-matrix-tables">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- How to Count Cards Guide Modal -->
+  <div id="counting-guide-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <h3 class="text-xl font-black text-amber-400 font-casino uppercase">The Hi-Lo Card Counting Guide</h3>
+        <button id="btn-close-guide" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+          ✕
+        </button>
+      </div>
+      
+      <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+          <h4 class="font-bold text-amber-400 uppercase mb-2">1. The Hi-Lo Card Values</h4>
+          <div class="grid grid-cols-3 gap-2 text-center font-mono font-bold">
+            <div class="bg-emerald-950/60 border border-emerald-500/40 p-2 rounded-xl text-emerald-300">
+              <div class="text-base">+1</div>
+              <div class="text-[11px] text-slate-300">2, 3, 4, 5, 6</div>
+              <div class="text-[9px] text-emerald-400 font-sans mt-0.5">Low Cards (Help Dealer)</div>
+            </div>
+            <div class="bg-slate-800/60 border border-slate-700 p-2 rounded-xl text-slate-300">
+              <div class="text-base">0</div>
+              <div class="text-[11px] text-slate-300">7, 8, 9</div>
+              <div class="text-[9px] text-slate-400 font-sans mt-0.5">Neutral Cards</div>
+            </div>
+            <div class="bg-rose-950/60 border border-rose-500/40 p-2 rounded-xl text-rose-300">
+              <div class="text-base">-1</div>
+              <div class="text-[11px] text-slate-300">10, J, Q, K, A</div>
+              <div class="text-[9px] text-rose-400 font-sans mt-0.5">High Cards (Help Player)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+          <h4 class="font-bold text-amber-400 uppercase mb-2">2. Running Count vs True Count</h4>
+          <p class="mb-2">
+            <strong>Running Count (RC):</strong> Every card dealt face-up adds or subtracts from your mental count. Note: in real casinos, the dealer's face-down card is not counted until revealed!
+          </p>
+          <p class="mb-2">
+            <strong>True Count (TC):</strong> Because high cards are spread across multiple decks, divide the Running Count by the estimated decks remaining in the shoe:
+          </p>
+          <div class="bg-slate-900 p-2.5 rounded-xl border border-slate-700 text-center font-mono font-bold text-amber-300 text-sm">
+            True Count = Running Count ÷ Decks Remaining
+          </div>
+          <p class="mt-2 text-slate-400">
+            <em>Example:</em> If the Running Count is <strong>+8</strong> and there are <strong>2 decks</strong> remaining, the True Count is <strong>+4</strong>.
+          </p>
+        </div>
+
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+          <h4 class="font-bold text-amber-400 uppercase mb-2">3. The Bet Spread (Ramping Your Bets)</h4>
+          <ul class="space-y-1.5 list-disc list-inside">
+            <li><strong>TC ≤ +1:</strong> Casino holds edge. Bet table minimum ($10).</li>
+            <li><strong>TC = +2:</strong> Slight player edge (~+0.5%). Ramp bet to 2x ($20).</li>
+            <li><strong>TC = +3:</strong> Strong edge (~+1.0%). Ramp bet to 4x ($40).</li>
+            <li><strong>TC ≥ +4:</strong> Hot shoe! (~+1.5% to +2.5%). Ramp bet to 6x–8x ($60–$80+).</li>
+          </ul>
+        </div>
+
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+          <h4 class="font-bold text-amber-400 uppercase mb-2">4. Key Strategy Deviations (Illustrious 18)</h4>
+          <ul class="space-y-1 list-disc list-inside">
+            <li><strong>Insurance:</strong> Take insurance ONLY if True Count ≥ +3.</li>
+            <li><strong>16 vs Dealer 10:</strong> Stand if True Count ≥ 0 (normally Hit).</li>
+            <li><strong>15 vs Dealer 10:</strong> Stand if True Count ≥ +4 (normally Hit).</li>
+            <li><strong>12 vs Dealer 3:</strong> Stand if True Count ≥ +2 (normally Hit).</li>
+            <li><strong>12 vs Dealer 2:</strong> Stand if True Count ≥ +3 (normally Hit).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load JavaScript Modules -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+/* Authentic Las Vegas Casino Felt & Game Styling */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap');
+
+:root {
+  --felt-green: #064e3b;
+  --felt-green-deep: #022c22;
+  --felt-accent: #059669;
+  --gold-accent: #fbbf24;
+  --gold-border: rgba(251, 191, 36, 0.45);
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #0b1120;
+  color: #f8fafc;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+.font-casino {
+  font-family: 'Cinzel', serif;
+}
+
+.font-mono-numbers {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Casino Table Felt Gradients and Border */
+.casino-felt {
+  background: radial-gradient(circle at 50% 35%, #065f46 0%, #064e3b 45%, #022c22 85%, #011913 100%);
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.65), 0 20px 40px rgba(0, 0, 0, 0.8);
+  border: 12px solid #291c13;
+  outline: 4px solid #452b1b;
+}
+
+.felt-subtle-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* Card 3D Flip Styles */
+.card-wrapper {
+  perspective: 1000px;
+  width: 78px;
+  height: 110px;
+  display: inline-block;
+  transition: transform 0.25s ease;
+}
+
+@media (min-width: 768px) {
+  .card-wrapper {
+    width: 90px;
+    height: 126px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .card-wrapper {
+    width: 96px;
+    height: 134px;
+  }
+}
+
+.card-wrapper:hover {
+  transform: translateY(-4px);
+}
+
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.card-inner.is-flipped {
+  transform: rotateY(0deg);
+}
+
+.card-inner:not(.is-flipped) {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card-front {
+  transform: rotateY(0deg);
+}
+
+.card-back {
+  transform: rotateY(180deg);
+}
+
+/* Animations */
+@keyframes cardDeal {
+  0% {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.8) rotate(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.animate-card-deal {
+  animation: cardDeal 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.5), inset 0 0 8px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(251, 191, 36, 0.85), inset 0 0 14px rgba(251, 191, 36, 0.5);
+  }
+}
+
+.glow-hint-action {
+  animation: pulseGlow 1.4s infinite ease-in-out;
+  border-color: #fbbf24 !important;
+}
+
+/* Casino Chip Styles */
+.casino-chip {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4), inset 0 2px 2px rgba(255, 255, 255, 0.4), inset 0 -2px 2px rgba(0, 0, 0, 0.4);
+}
+
+.casino-chip:hover:not(:disabled) {
+  transform: translateY(-4px) scale(1.06);
+  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.5), inset 0 2px 2px rgba(255, 255, 255, 0.4);
+}
+
+.casino-chip:active:not(:disabled) {
+  transform: translateY(1px) scale(0.96);
+}
+
+/* Chip edge dashes and center ring */
+.casino-chip::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+
+.casino-chip::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.chip-5 {
+  background: radial-gradient(circle, #ef4444 65%, #b91c1c 100%);
+  color: #ffffff;
+}
+
+.chip-10 {
+  background: radial-gradient(circle, #3b82f6 65%, #1d4ed8 100%);
+  color: #ffffff;
+}
+
+.chip-25 {
+  background: radial-gradient(circle, #10b981 65%, #047857 100%);
+  color: #ffffff;
+}
+
+.chip-50 {
+  background: radial-gradient(circle, #f97316 65%, #c2410c 100%);
+  color: #ffffff;
+}
+
+.chip-100 {
+  background: radial-gradient(circle, #1f2937 65%, #111827 100%);
+  color: #fbbf24;
+  border: 1px solid #4b5563;
+}
+
+.chip-500 {
+  background: radial-gradient(circle, #a855f7 65%, #7e22ce 100%);
+  color: #ffffff;
+}
+
+/* Table Felt Decorative Lines */
+.insurance-banner {
+  border: 2px solid rgba(251, 191, 36, 0.35);
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  color: rgba(251, 191, 36, 0.85);
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* Speech bubbles for AI players */
+.speech-bubble {
+  position: relative;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0;
+  border-style: solid;
+  border-color: #1e293b transparent;
+  display: block;
+  width: 0;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
