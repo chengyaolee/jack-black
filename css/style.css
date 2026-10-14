@@ -262,13 +262,46 @@ body {
   background: #475569;
 }
 
-/* Live Count Peek Drawer - Solid Opaque Window */
+/* Live Count Peek Drawer - Solid Opaque Window & Deterministic States */
 #live-count-peek-drawer {
   background-color: #0f172a !important;
   border: 2px solid #475569 !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 1px rgba(255, 255, 255, 0.2);
+  z-index: 50 !important;
 }
 
 #live-count-peek-drawer:hover {
   border-color: #64748b !important;
+}
+
+/* Visibility State */
+#live-count-peek-drawer.drawer-closed {
+  display: none !important;
+}
+
+#live-count-peek-drawer.drawer-open {
+  display: block !important;
+}
+
+/* Minimized State */
+#live-count-peek-drawer.drawer-minimized {
+  width: auto !important;
+  max-width: fit-content !important;
+}
+
+#live-count-peek-drawer.drawer-minimized #peek-expanded-content {
+  display: none !important;
+}
+
+#live-count-peek-drawer.drawer-minimized #peek-minimized-content {
+  display: flex !important;
+}
+
+/* Expanded State */
+#live-count-peek-drawer:not(.drawer-minimized) #peek-expanded-content {
+  display: block !important;
+}
+
+#live-count-peek-drawer:not(.drawer-minimized) #peek-minimized-content {
+  display: none !important;
 }

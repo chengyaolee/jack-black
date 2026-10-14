@@ -11,7 +11,7 @@ export class UIController {
     this.toggles = {
       bettingHints: true,
       strategyHints: true,
-      peekCount: true // Default to true so user sees live count by default
+      peekCount: false // Default to false (hidden by default)
     };
     this.isPeekMinimized = false;
 
@@ -632,27 +632,29 @@ export class UIController {
       btnSound.innerHTML = sound.isMuted() ? '🔇' : '🔊';
     }
 
-    // Live Peek Drawer Toggle (Top Navbar Button)
+    // 1. Live Peek Drawer Toggle (Top Navbar Button)
     const btnPeek = document.getElementById('btn-toggle-peek');
     if (btnPeek) {
-      btnPeek.onclick = () => {
-        if (!this.toggles.peekCount) {
-          this.toggles.peekCount = true;
-          this.isPeekMinimized = false;
-        } else {
-          this.toggles.peekCount = false;
-        }
+      btnPeek.onclick = (e) => {
+        if (e) e.preventDefault();
+        this.toggles.peekCount = !this.toggles.peekCount;
         this.saveToggles();
         this.updateToggleButtonsUI();
       };
     }
 
-    // Live Peek Drawer Minimize Button ('−')
+    // 2. Live Peek Drawer Minimize Button ('−')
+    // Minimise will make the window small but keep toggle on!
     const btnMinPeek = document.getElementById('btn-minimize-peek');
     if (btnMinPeek) {
       btnMinPeek.onclick = (e) => {
-        e.stopPropagation();
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         this.isPeekMinimized = true;
+        this.toggles.peekCount = true; // KEEP TOGGLE ON!
+        this.saveToggles();
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('jb_peek_minimized', 'true');
         }
@@ -660,39 +662,44 @@ export class UIController {
       };
     }
 
-    // Live Peek Drawer Close Button ('✕')
+    // 3. Live Peek Drawer Close Button ('✕')
+    // 'X' will turn off the toggle and the window should not be visible!
     const btnClosePeek = document.getElementById('btn-close-peek');
     if (btnClosePeek) {
       btnClosePeek.onclick = (e) => {
-        e.stopPropagation();
-        this.toggles.peekCount = false;
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        this.toggles.peekCount = false; // TURN OFF TOGGLE!
         this.saveToggles();
         this.updateToggleButtonsUI();
       };
     }
 
-    // Minimized Pill Click to Expand
+    // 4. Minimized Pill Click to Expand (keeps toggle on!)
+    const expandFromMini = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      this.isPeekMinimized = false;
+      this.toggles.peekCount = true; // KEEP TOGGLE ON!
+      this.saveToggles();
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('jb_peek_minimized', 'false');
+      }
+      this.updateToggleButtonsUI();
+    };
+
     const minContent = document.getElementById('peek-minimized-content');
     if (minContent) {
-      minContent.onclick = () => {
-        this.isPeekMinimized = false;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('jb_peek_minimized', 'false');
-        }
-        this.updateToggleButtonsUI();
-      };
+      minContent.onclick = expandFromMini;
     }
 
     const btnExpPeek = document.getElementById('btn-expand-peek');
     if (btnExpPeek) {
-      btnExpPeek.onclick = (e) => {
-        e.stopPropagation();
-        this.isPeekMinimized = false;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('jb_peek_minimized', 'false');
-        }
-        this.updateToggleButtonsUI();
-      };
+      btnExpPeek.onclick = expandFromMini;
     }
 
     // Hint Toggles
@@ -720,39 +727,29 @@ export class UIController {
   updateToggleButtonsUI() {
     const btnPeek = document.getElementById('btn-toggle-peek');
     const peekDrawer = document.getElementById('live-count-peek-drawer');
-    const expandedContent = document.getElementById('peek-expanded-content');
-    const minimizedContent = document.getElementById('peek-minimized-content');
 
+    // 1. Top Navbar button: active if peekCount is true (whether minimized or expanded!)
     if (btnPeek) {
-      btnPeek.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
-        this.toggles.peekCount 
-          ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-sm' 
-          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
-      }`;
+      if (this.toggles.peekCount) {
+        btnPeek.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 border bg-amber-500/20 text-amber-300 border-amber-500 shadow-sm';
+      } else {
+        btnPeek.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 border bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200';
+      }
     }
 
+    // 2. Window visibility and minimized state via deterministic CSS
     if (peekDrawer) {
       if (this.toggles.peekCount) {
-        peekDrawer.classList.remove('hidden');
+        peekDrawer.classList.remove('drawer-closed');
+        peekDrawer.classList.add('drawer-open');
         if (this.isPeekMinimized) {
-          if (expandedContent) expandedContent.classList.add('hidden');
-          if (minimizedContent) {
-            minimizedContent.classList.remove('hidden');
-            minimizedContent.classList.add('flex');
-          }
-          peekDrawer.classList.remove('max-w-[300px]');
-          peekDrawer.classList.add('max-w-[260px]');
+          peekDrawer.classList.add('drawer-minimized');
         } else {
-          if (expandedContent) expandedContent.classList.remove('hidden');
-          if (minimizedContent) {
-            minimizedContent.classList.add('hidden');
-            minimizedContent.classList.remove('flex');
-          }
-          peekDrawer.classList.add('max-w-[300px]');
-          peekDrawer.classList.remove('max-w-[260px]');
+          peekDrawer.classList.remove('drawer-minimized');
         }
       } else {
-        peekDrawer.classList.add('hidden');
+        peekDrawer.classList.remove('drawer-open');
+        peekDrawer.classList.add('drawer-closed');
       }
     }
 
