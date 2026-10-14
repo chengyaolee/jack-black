@@ -11,16 +11,21 @@ export class UIController {
     this.toggles = {
       bettingHints: true,
       strategyHints: true,
-      peekCount: false
+      peekCount: true // Default to true so user sees live count by default
     };
+    this.isPeekMinimized = false;
 
-    // Load saved hint toggles
+    // Load saved hint toggles and minimize state
     if (typeof localStorage !== 'undefined') {
       const savedToggles = localStorage.getItem('jb_toggles');
       if (savedToggles) {
         try {
           this.toggles = { ...this.toggles, ...JSON.parse(savedToggles) };
         } catch (e) {}
+      }
+      const savedMin = localStorage.getItem('jb_peek_minimized');
+      if (savedMin !== null) {
+        this.isPeekMinimized = savedMin === 'true';
       }
     }
 
@@ -79,24 +84,42 @@ export class UIController {
 
     // Peek Drawer content
     const rcEl = document.getElementById('peek-running-count');
+    const rcText = shoeData.runningCount > 0 ? `+${shoeData.runningCount}` : `${shoeData.runningCount}`;
+    const rcColor = shoeData.runningCount > 0 ? 'text-emerald-400' : (shoeData.runningCount < 0 ? 'text-rose-400' : 'text-slate-200');
     if (rcEl) {
-      rcEl.innerText = shoeData.runningCount > 0 ? `+${shoeData.runningCount}` : `${shoeData.runningCount}`;
-      rcEl.className = `font-mono-numbers text-xl font-black ${
-        shoeData.runningCount > 0 ? 'text-emerald-400' : (shoeData.runningCount < 0 ? 'text-rose-400' : 'text-slate-200')
-      }`;
+      rcEl.innerText = rcText;
+      rcEl.className = `font-mono-numbers text-2xl font-black ${rcColor} my-0.5`;
     }
 
     const tcEl = document.getElementById('peek-true-count');
+    const tcVal = shoeData.trueCount.rounded;
+    const tcText = tcVal > 0 ? `+${tcVal}` : `${tcVal}`;
+    const tcColor = tcVal > 0 ? 'text-emerald-400' : (tcVal < 0 ? 'text-rose-400' : 'text-slate-200');
     if (tcEl) {
-      const tcVal = shoeData.trueCount.rounded;
-      tcEl.innerText = tcVal > 0 ? `+${tcVal}` : `${tcVal}`;
-      tcEl.className = `font-mono-numbers text-xl font-black ${
-        tcVal > 0 ? 'text-emerald-400' : (tcVal < 0 ? 'text-rose-400' : 'text-slate-200')
-      }`;
+      tcEl.innerText = tcText;
+      tcEl.className = `font-mono-numbers text-2xl font-black ${tcColor} my-0.5`;
     }
 
     const penTextEl = document.getElementById('peek-penetration-text');
     if (penTextEl) penTextEl.innerText = `${shoeData.penetration}% (Cut at 75%)`;
+
+    // Minimized Pill elements
+    const miniRcEl = document.getElementById('peek-mini-rc');
+    if (miniRcEl) {
+      miniRcEl.innerText = `RC: ${rcText}`;
+      miniRcEl.className = `font-mono font-black ${rcColor}`;
+    }
+
+    const miniTcEl = document.getElementById('peek-mini-tc');
+    if (miniTcEl) {
+      miniTcEl.innerText = `TC: ${tcText}`;
+      miniTcEl.className = `font-mono font-black ${tcColor}`;
+    }
+
+    const decksDetailEl = document.getElementById('peek-decks-detail');
+    if (decksDetailEl) {
+      decksDetailEl.innerText = `Decks: ~${shoeData.decksRemaining}`;
+    }
   }
 
   renderGameTable(gameState, gameEngine) {
@@ -609,13 +632,65 @@ export class UIController {
       btnSound.innerHTML = sound.isMuted() ? '🔇' : '🔊';
     }
 
-    // Live Peek Drawer Toggle
+    // Live Peek Drawer Toggle (Top Navbar Button)
     const btnPeek = document.getElementById('btn-toggle-peek');
-    const peekDrawer = document.getElementById('live-count-peek-drawer');
-    if (btnPeek && peekDrawer) {
+    if (btnPeek) {
       btnPeek.onclick = () => {
-        this.toggles.peekCount = !this.toggles.peekCount;
+        if (!this.toggles.peekCount) {
+          this.toggles.peekCount = true;
+          this.isPeekMinimized = false;
+        } else {
+          this.toggles.peekCount = false;
+        }
         this.saveToggles();
+        this.updateToggleButtonsUI();
+      };
+    }
+
+    // Live Peek Drawer Minimize Button ('−')
+    const btnMinPeek = document.getElementById('btn-minimize-peek');
+    if (btnMinPeek) {
+      btnMinPeek.onclick = (e) => {
+        e.stopPropagation();
+        this.isPeekMinimized = true;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('jb_peek_minimized', 'true');
+        }
+        this.updateToggleButtonsUI();
+      };
+    }
+
+    // Live Peek Drawer Close Button ('✕')
+    const btnClosePeek = document.getElementById('btn-close-peek');
+    if (btnClosePeek) {
+      btnClosePeek.onclick = (e) => {
+        e.stopPropagation();
+        this.toggles.peekCount = false;
+        this.saveToggles();
+        this.updateToggleButtonsUI();
+      };
+    }
+
+    // Minimized Pill Click to Expand
+    const minContent = document.getElementById('peek-minimized-content');
+    if (minContent) {
+      minContent.onclick = () => {
+        this.isPeekMinimized = false;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('jb_peek_minimized', 'false');
+        }
+        this.updateToggleButtonsUI();
+      };
+    }
+
+    const btnExpPeek = document.getElementById('btn-expand-peek');
+    if (btnExpPeek) {
+      btnExpPeek.onclick = (e) => {
+        e.stopPropagation();
+        this.isPeekMinimized = false;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('jb_peek_minimized', 'false');
+        }
         this.updateToggleButtonsUI();
       };
     }
@@ -645,20 +720,39 @@ export class UIController {
   updateToggleButtonsUI() {
     const btnPeek = document.getElementById('btn-toggle-peek');
     const peekDrawer = document.getElementById('live-count-peek-drawer');
+    const expandedContent = document.getElementById('peek-expanded-content');
+    const minimizedContent = document.getElementById('peek-minimized-content');
+
     if (btnPeek) {
       btnPeek.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
         this.toggles.peekCount 
-          ? 'bg-amber-500/20 text-amber-300 border-amber-500' 
+          ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-sm' 
           : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
       }`;
     }
+
     if (peekDrawer) {
       if (this.toggles.peekCount) {
-        peekDrawer.classList.remove('opacity-40', 'translate-y-2');
-        peekDrawer.classList.add('opacity-100', 'translate-y-0', 'ring-2', 'ring-amber-400/40');
+        peekDrawer.classList.remove('hidden');
+        if (this.isPeekMinimized) {
+          if (expandedContent) expandedContent.classList.add('hidden');
+          if (minimizedContent) {
+            minimizedContent.classList.remove('hidden');
+            minimizedContent.classList.add('flex');
+          }
+          peekDrawer.classList.remove('max-w-[300px]');
+          peekDrawer.classList.add('max-w-[260px]');
+        } else {
+          if (expandedContent) expandedContent.classList.remove('hidden');
+          if (minimizedContent) {
+            minimizedContent.classList.add('hidden');
+            minimizedContent.classList.remove('flex');
+          }
+          peekDrawer.classList.add('max-w-[300px]');
+          peekDrawer.classList.remove('max-w-[260px]');
+        }
       } else {
-        peekDrawer.classList.remove('opacity-100', 'translate-y-0', 'ring-2', 'ring-amber-400/40');
-        peekDrawer.classList.add('opacity-40', 'translate-y-2');
+        peekDrawer.classList.add('hidden');
       }
     }
 

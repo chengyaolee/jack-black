@@ -376,26 +376,61 @@
     <!-- ========================================== -->
     <!-- LIVE COUNT PEEK DRAWER (Toggle 3)          -->
     <!-- ========================================== -->
-    <div id="live-count-peek-drawer" class="fixed bottom-4 right-4 bg-slate-900/95 border border-slate-700/80 rounded-2xl p-3.5 shadow-2xl backdrop-blur z-30 transition-all duration-300 opacity-40 translate-y-2 max-w-[280px]">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-        <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-          <span>👁️</span> Live Count Peek
-        </span>
-        <span class="text-[10px] text-slate-400 font-mono">Hi-Lo System</span>
-      </div>
-      <div class="grid grid-cols-2 gap-3 text-center">
-        <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
-          <div class="text-[10px] text-slate-400 font-semibold">Running Count</div>
-          <div id="peek-running-count" class="font-mono-numbers text-xl font-black text-slate-200">0</div>
+    <div id="live-count-peek-drawer" class="fixed bottom-4 right-4 bg-slate-900 border-2 border-slate-600 rounded-2xl shadow-2xl z-30 transition-all duration-200 max-w-[300px] w-full text-white">
+      
+      <!-- Expanded State Content -->
+      <div id="peek-expanded-content" class="p-3.5">
+        <!-- Header with Minimize & Close buttons -->
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
+          <div class="flex items-center gap-1.5 text-xs font-black text-amber-400">
+            <span>👁️</span>
+            <span>Live Count Peek</span>
+            <span class="text-[9px] text-slate-400 font-mono font-normal">(Hi-Lo)</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button id="btn-minimize-peek" class="px-2 py-0.5 rounded text-xs text-slate-400 hover:text-white hover:bg-slate-800 font-bold transition border border-transparent hover:border-slate-700" title="Minimize to compact bar">
+              −
+            </button>
+            <button id="btn-close-peek" class="px-2 py-0.5 rounded text-xs text-slate-400 hover:text-rose-400 hover:bg-slate-800 font-bold transition border border-transparent hover:border-slate-700" title="Hide Live Count">
+              ✕
+            </button>
+          </div>
         </div>
-        <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
-          <div class="text-[10px] text-slate-400 font-semibold">True Count</div>
-          <div id="peek-true-count" class="font-mono-numbers text-xl font-black text-slate-200">0.0</div>
+
+        <!-- Metric Grid -->
+        <div class="grid grid-cols-2 gap-2.5 text-center">
+          <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 shadow-inner">
+            <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Running Count</div>
+            <div id="peek-running-count" class="font-mono-numbers text-2xl font-black text-emerald-400 my-0.5">0</div>
+            <div class="text-[9px] text-slate-400">Face-up cards sum</div>
+          </div>
+          <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 shadow-inner">
+            <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">True Count</div>
+            <div id="peek-true-count" class="font-mono-numbers text-2xl font-black text-emerald-400 my-0.5">0.0</div>
+            <div class="text-[9px] text-slate-400">RC ÷ Decks Left</div>
+          </div>
+        </div>
+
+        <!-- Shoe & Penetration detail -->
+        <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
+          <span id="peek-decks-detail">Decks: ~6.0</span>
+          <span id="peek-penetration-text" class="text-amber-400/90 font-semibold">0% Penetration (Cut: 75%)</span>
         </div>
       </div>
-      <div class="mt-2 text-[10px] text-slate-400 text-center font-mono" id="peek-penetration-text">
-        0% Penetration (Cut at 75%)
+
+      <!-- Minimized Compact Pill -->
+      <div id="peek-minimized-content" class="hidden p-2.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-800/80 rounded-2xl transition" title="Click to expand Live Count">
+        <div class="flex items-center gap-2 text-xs font-bold">
+          <span class="text-amber-400">👁️</span>
+          <span id="peek-mini-rc" class="font-mono font-black text-emerald-400">RC: 0</span>
+          <span class="text-slate-600">|</span>
+          <span id="peek-mini-tc" class="font-mono font-black text-amber-300">TC: 0.0</span>
+        </div>
+        <button id="btn-expand-peek" class="text-slate-400 hover:text-white text-xs font-bold px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition border border-slate-700" title="Expand panel">
+          ▲ Expand
+        </button>
       </div>
+
     </div>
 
   </main>
