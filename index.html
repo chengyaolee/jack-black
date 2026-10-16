@@ -23,6 +23,8 @@
       }
     }
   </script>
+  <!-- PeerJS WebRTC P2P Library for Serverless Multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="./css/style.css">
 </head>
@@ -95,6 +97,13 @@
           <span class="hidden md:inline">Peek Count</span>
         </button>
 
+        <!-- Multiplayer Button -->
+        <button id="btn-open-multiplayer" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border bg-amber-500/20 text-amber-300 border-amber-500/60 hover:bg-amber-500/30 shadow-sm" title="Play with friends in real-time">
+          <span>👥</span>
+          <span class="hidden sm:inline">Multiplayer</span>
+          <span id="multiplayer-status-badge" class="w-2 h-2 rounded-full bg-slate-500 inline-block"></span>
+        </button>
+
         <div class="h-4 w-[1px] bg-slate-700 mx-1 hidden sm:block"></div>
 
         <!-- Strategy Matrix Modal Button -->
@@ -123,6 +132,34 @@
     <!-- MODE 2: VEGAS TABLE & AI SIMULATION VIEW   -->
     <!-- ========================================== -->
     <div id="game-mode-view" class="flex-1 flex flex-col justify-between">
+      
+      <!-- Multiplayer Room Active Bar (visible when hosting or joined) -->
+      <div id="multiplayer-active-bar" class="hidden bg-slate-900/90 border border-amber-500/50 rounded-2xl p-2.5 mb-3 flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg shadow-amber-500/10">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-300 font-medium">Room: <strong id="mp-bar-room-code" class="font-mono text-amber-400 text-sm tracking-wider">BJ-XXXX</strong></span>
+          <span id="mp-bar-role-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 uppercase">HOST</span>
+          <span id="mp-bar-peers-count" class="text-slate-400 text-[11px]">(1 player)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Quick Reaction Buttons -->
+          <div class="flex items-center gap-1 bg-slate-950/80 px-2 py-1 rounded-xl border border-slate-800">
+            <button class="btn-send-reaction hover:scale-125 transition text-base" data-emoji="👏" title="Cheer">👏</button>
+            <button class="btn-send-reaction hover:scale-125 transition text-base" data-emoji="🔥" title="Fire">🔥</button>
+            <button class="btn-send-reaction hover:scale-125 transition text-base" data-emoji="💰" title="Cash">💰</button>
+            <button class="btn-send-reaction hover:scale-125 transition text-base" data-emoji="🍀" title="Luck">🍀</button>
+            <button class="btn-send-reaction hover:scale-125 transition text-base" data-emoji="😭" title="Bad Beat">😭</button>
+            <button class="btn-send-reaction hover:scale-125 transition text-base" data-emoji="😱" title="Shock">😱</button>
+          </div>
+          <button id="btn-mp-copy-link" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition border border-slate-700 flex items-center gap-1">
+            <span>📋</span>
+            <span>Invite Link</span>
+          </button>
+          <button id="btn-mp-leave" class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold transition border border-rose-500/40">
+            Leave
+          </button>
+        </div>
+      </div>
       
       <!-- Table Controls Bar: Seat Selector & AI Delta Slider -->
       <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 mb-3 flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -664,6 +701,154 @@
           </ul>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Multiplayer Modal -->
+  <div id="multiplayer-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">👥</span>
+          <div>
+            <h3 class="text-xl font-black text-amber-400 font-casino uppercase">Multiplayer Table</h3>
+            <p class="text-xs text-slate-400">Play together in real time • Serverless WebRTC P2P</p>
+          </div>
+        </div>
+        <button id="btn-close-multiplayer" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+          ✕
+        </button>
+      </div>
+
+      <!-- Mode Selector Tabs: Host vs Join -->
+      <div id="mp-tabs-container" class="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 mb-5">
+        <button id="mp-tab-host" class="py-2 text-xs font-bold rounded-lg bg-amber-500 text-slate-950 transition shadow">
+          👑 Host Table
+        </button>
+        <button id="mp-tab-join" class="py-2 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition">
+          🎟️ Join Room
+        </button>
+      </div>
+
+      <!-- Common Player Customization -->
+      <div class="bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800 mb-4">
+        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Your Player Identity:</div>
+        <div class="flex items-center gap-3">
+          <!-- Avatar Selector -->
+          <div class="relative">
+            <select id="mp-player-avatar" class="bg-slate-900 text-2xl p-2 rounded-xl border border-slate-700 cursor-pointer appearance-none text-center pr-6">
+              <option value="😎">😎 Cool</option>
+              <option value="🤠">🤠 Cowboy</option>
+              <option value="🧠">🧠 Counter</option>
+              <option value="🎲">🎲 Gambler</option>
+              <option value="👑">👑 High Roller</option>
+              <option value="💃">💃 Lucky</option>
+              <option value="🦹">🦹 Hustler</option>
+              <option value="🤖">🤖 Cyborg</option>
+            </select>
+          </div>
+          <!-- Player Name Input -->
+          <div class="flex-1">
+            <input id="mp-player-name" type="text" maxlength="15" placeholder="Enter nickname..." value="Player 1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 font-semibold">
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= HOST PANEL ================= -->
+      <div id="mp-panel-host" class="space-y-4">
+        <!-- Idle State (Before hosting) -->
+        <div id="mp-host-idle-state" class="space-y-3">
+          <p class="text-xs text-slate-300">
+            Create an authoritative Vegas table. You control the shoe and dealing, while friends can join your table to place bets and make moves live from their own devices!
+          </p>
+          <button id="btn-mp-start-host" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider transition shadow-lg shadow-amber-500/20">
+            Create Table & Generate Code
+          </button>
+        </div>
+
+        <!-- Active Host State -->
+        <div id="mp-host-active-state" class="hidden space-y-3">
+          <div class="bg-emerald-950/40 border border-emerald-500/40 p-4 rounded-2xl text-center">
+            <div class="text-[11px] uppercase tracking-wider text-emerald-400 font-bold mb-1">Your Room Code:</div>
+            <div id="mp-display-room-code" class="text-3xl font-black font-mono tracking-widest text-amber-400 select-all my-1">
+              BJ-XXXX
+            </div>
+            <p class="text-[11px] text-slate-400">Share this code or copy the invite link below for your friends.</p>
+          </div>
+
+          <div class="flex gap-2">
+            <button id="btn-mp-copy-code" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700 flex items-center justify-center gap-1.5">
+              <span>📋</span>
+              <span>Copy Code</span>
+            </button>
+            <button id="btn-mp-copy-invite" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow flex items-center justify-center gap-1.5">
+              <span>🔗</span>
+              <span>Copy Direct Link</span>
+            </button>
+          </div>
+
+          <!-- Connected Peers List -->
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <div class="flex items-center justify-between text-xs mb-2">
+              <span class="text-slate-400 font-semibold">Table Occupancy:</span>
+              <span id="mp-host-seats-count" class="font-mono text-emerald-400 font-bold">1 / 5 seats</span>
+            </div>
+            <div id="mp-host-players-list" class="space-y-1.5 text-xs">
+              <!-- Dynamically rendered list of players -->
+            </div>
+          </div>
+
+          <button id="btn-mp-end-host" class="w-full py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-500/40 text-rose-300 font-bold text-xs transition">
+            Close Multiplayer Table
+          </button>
+        </div>
+      </div>
+
+      <!-- ================= JOIN PANEL ================= -->
+      <div id="mp-panel-join" class="hidden space-y-4">
+        <!-- Idle Join State -->
+        <div id="mp-join-idle-state" class="space-y-3">
+          <div class="bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+            <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+              Enter 5-Character Room Code:
+            </label>
+            <input id="mp-input-room-code" type="text" maxlength="5" placeholder="e.g. 7X9K2" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-center font-mono text-xl tracking-widest text-amber-400 uppercase focus:outline-none focus:border-amber-400 font-bold placeholder-slate-600">
+          </div>
+
+          <button id="btn-mp-join-room" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/20">
+            Join Vegas Table
+          </button>
+        </div>
+
+        <!-- Active Client State -->
+        <div id="mp-client-active-state" class="hidden space-y-3">
+          <div class="bg-emerald-950/40 border border-emerald-500/40 p-4 rounded-2xl text-center">
+            <div class="text-[11px] uppercase tracking-wider text-emerald-400 font-bold mb-1">Connected to Room:</div>
+            <div id="mp-client-room-code" class="text-2xl font-black font-mono tracking-widest text-amber-400 my-1">
+              BJ-XXXX
+            </div>
+            <p id="mp-client-seat-info" class="text-xs text-slate-300 mt-1">Assigned Seat: <strong class="text-emerald-400">Seat #2</strong></p>
+          </div>
+
+          <p class="text-xs text-slate-400 text-center">
+            You are playing on the host's authoritative table. Place your bets during betting phase and use your action buttons when it's your turn!
+          </p>
+
+          <button id="btn-mp-leave-room" class="w-full py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-500/40 text-rose-300 font-bold text-xs transition">
+            Leave Table
+          </button>
+        </div>
+      </div>
+
+      <!-- Security / Encryption Notice Footnote -->
+      <div class="mt-5 pt-3 border-t border-slate-800 text-[10px] text-slate-500 flex items-center justify-between">
+        <span class="flex items-center gap-1">
+          <span>🔒</span>
+          <span>Peer-to-peer DTLS encrypted • Zero backend logs</span>
+        </span>
+        <span class="font-mono text-slate-400">WebRTC DataChannel</span>
+      </div>
+
     </div>
   </div>
 

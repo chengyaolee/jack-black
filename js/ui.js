@@ -163,10 +163,12 @@ export class UIController {
     if (seatsContainer) {
       seatsContainer.innerHTML = '';
       seats.forEach((seat, seatIdx) => {
+        const isClient = gameEngine.multiplayer && gameEngine.multiplayer.isClient();
+        const isSelf = isClient ? (seatIdx === gameEngine.multiplayer.assignedSeatIndex) : seat.isUser;
         const isCurrentSeat = seatIdx === activeSeatIndex && gameEngine.phase === 'PLAYING';
-        const isUser = seat.isUser;
 
         const seatDiv = document.createElement('div');
+        seatDiv.id = `seat-container-${seatIdx}`;
         seatDiv.className = `flex flex-col items-center justify-between p-3 rounded-2xl transition-all duration-300 relative ${
           isCurrentSeat 
             ? 'ring-2 ring-amber-400 bg-amber-950/30 scale-105 shadow-xl shadow-amber-500/10' 
@@ -199,7 +201,7 @@ export class UIController {
           hand.cards.forEach(card => {
             const cardEl = createCardElement(card, {
               faceUp: true,
-              theme: isUser ? 'navy' : 'burgundy',
+              theme: isSelf ? 'navy' : 'burgundy',
               showCountBadge: this.toggles.peekCount
             });
             cardsRow.appendChild(cardEl);
@@ -253,19 +255,27 @@ export class UIController {
         playerFooter.innerHTML = `
           <div class="flex items-center gap-1.5 font-bold truncate">
             <span>${seat.avatar}</span>
-            <span class="${isUser ? 'text-amber-400 font-extrabold' : 'text-slate-300'} truncate">${seat.name}</span>
+            <span class="${isSelf ? 'text-amber-400 font-extrabold' : 'text-slate-300'} truncate">
+              ${seat.name} ${isSelf ? '(You)' : ''}
+              ${seat.isRemote ? '<span class="text-[9px] px-1 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-600/40 font-mono">P2P</span>' : ''}
+            </span>
           </div>
           <div class="flex items-center gap-1.5">
             <span class="font-mono text-emerald-400 font-bold">$${seat.bankroll}</span>
-            ${isUser ? '<button class="btn-reload-bankroll text-[10px] px-1 py-0.2 rounded bg-emerald-950/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-600/40" title="Reload +$1,000 chips">+</button>' : ''}
+            ${isSelf ? '<button class="btn-reload-bankroll text-[10px] px-1 py-0.2 rounded bg-emerald-950/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-600/40" title="Reload +$1,000 chips">+</button>' : ''}
           </div>
         `;
-        if (isUser) {
+        if (isSelf) {
           const reloadBtn = playerFooter.querySelector('.btn-reload-bankroll');
           if (reloadBtn) {
             reloadBtn.onclick = (e) => {
               e.stopPropagation();
-              gameEngine.rebuyBankroll(1000);
+              if (isClient) {
+                seat.bankroll = (seat.bankroll || 0) + 1000;
+                gameEngine.notifyUpdate();
+              } else {
+                gameEngine.rebuyBankroll(1000);
+              }
             };
           }
         }
@@ -286,8 +296,26 @@ export class UIController {
     const strategyAdvisor = document.getElementById('strategy-advisor-banner');
     const insuranceModal = document.getElementById('insurance-modal');
 
-    const user = gameEngine.getUserSeat();
-    const isUserTurn = gameEngine.phase === 'PLAYING' && gameEngine.activeSeatIndex === gameEngine.userSeatIndex;
+    const isClient = gameEngine.multiplayer && gameEngine.multiplayer.isClient();
+    const assignedSeatIdx = isClient ? gameEngine.multiplayer.assignedSeatIndex : gameEngine.userSeatIndex;
+    const user = (gameEngine.seats && gameEngine.seats[assignedSeatIdx]) ? gameEngine.seats[assignedSeatIdx] : gameEngine.getUserSeat();
+    const isUserTurn = gameEngine.phase === 'PLAYING' && gameEngine.activeSeatIndex === assignedSeatIdx;
+
+    // Deal Button: if client, indicate host control
+    const btnDeal = document.getElementById('btn-deal-cards');
+    if (isClient) {
+      if (btnDeal) {
+        btnDeal.disabled = true;
+        btnDeal.innerText = 'WAITING FOR HOST TO DEAL...';
+        btnDeal.className = 'w-full md:w-auto px-8 py-3 rounded-xl bg-slate-800 text-slate-400 font-bold text-sm cursor-not-allowed border border-slate-700';
+      }
+    } else {
+      if (btnDeal) {
+        btnDeal.disabled = false;
+        btnDeal.innerText = 'DEAL CARDS';
+        btnDeal.className = 'w-full md:w-auto px-8 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider transition shadow-lg shadow-amber-500/20 active:scale-95';
+      }
+    }
 
     // Betting Phase
     if (gameEngine.phase === 'BETTING') {
@@ -302,7 +330,7 @@ export class UIController {
       }
 
       // Update Betting Sizing Advisor
-      if (this.toggles.bettingHints) {
+      if (this.toggles.bettingHints && user) {
         const advice = getBettingAdvice(gameEngine.shoe.getTrueCount(), user.currentBet, gameEngine.minBet, gameEngine.maxBet);
         advisorBanner.classList.remove('hidden');
 
@@ -316,7 +344,14 @@ export class UIController {
         if (applyBtn) {
           applyBtn.innerText = `Apply $${advice.recommendedBet} Bet`;
           applyBtn.onclick = () => {
-            gameEngine.setUserBet(advice.recommendedBet);
+            if (isClient) {
+              gameEngine.multiplayer.sendBet(advice.recommendedBet);
+              user.currentBet = advice.recommendedBet;
+              if (user.hands && user.hands[0]) user.hands[0].bet = advice.recommendedBet;
+              if (currentBetDisplay) currentBetDisplay.innerText = `$${user.currentBet}`;
+            } else {
+              gameEngine.setUserBet(advice.recommendedBet);
+            }
             sound.playChipClink();
           };
         }
@@ -338,22 +373,27 @@ export class UIController {
 
     // Insurance Phase
     if (gameEngine.phase === 'INSURANCE') {
-      insuranceModal.classList.remove('hidden');
-      const insCost = Math.floor(user.currentBet / 2);
-      const insCostSpan = document.getElementById('insurance-cost-display');
-      if (insCostSpan) insCostSpan.innerText = `$${insCost}`;
+      const showInsurance = user && user.hands[0] && !user.hands[0].info.isBlackjack && user.bankroll >= Math.floor(user.currentBet / 2);
+      if (showInsurance) {
+        insuranceModal.classList.remove('hidden');
+        const insCost = Math.floor(user.currentBet / 2);
+        const insCostSpan = document.getElementById('insurance-cost-display');
+        if (insCostSpan) insCostSpan.innerText = `$${insCost}`;
 
-      // Insurance Advice
-      const insAdviceEl = document.getElementById('insurance-advisor-text');
-      const tc = gameEngine.shoe.getTrueCount();
-      if (insAdviceEl) {
-        if (tc.floored >= 3) {
-          insAdviceEl.innerText = `💡 Strategy Hint: True Count is +${tc.rounded} (≥ +3). Take Insurance!`;
-          insAdviceEl.className = 'text-xs text-amber-300 font-bold';
-        } else {
-          insAdviceEl.innerText = `💡 Strategy Hint: True Count is ${tc.rounded} (< +3). Decline Insurance.`;
-          insAdviceEl.className = 'text-xs text-slate-300';
+        // Insurance Advice
+        const insAdviceEl = document.getElementById('insurance-advisor-text');
+        const tc = gameEngine.shoe.getTrueCount();
+        if (insAdviceEl) {
+          if (tc.floored >= 3) {
+            insAdviceEl.innerText = `💡 Strategy Hint: True Count is +${tc.rounded} (≥ +3). Take Insurance!`;
+            insAdviceEl.className = 'text-xs text-amber-300 font-bold';
+          } else {
+            insAdviceEl.innerText = `💡 Strategy Hint: True Count is ${tc.rounded} (< +3). Decline Insurance.`;
+            insAdviceEl.className = 'text-xs text-slate-300';
+          }
         }
+      } else {
+        insuranceModal.classList.add('hidden');
       }
     } else {
       insuranceModal.classList.add('hidden');
@@ -373,10 +413,10 @@ export class UIController {
         if (b) b.classList.remove('glow-hint-action');
       });
 
-      if (isUserTurn) {
-        const userHand = user.hands[gameEngine.activeHandIndex];
-        const canDouble = userHand.cards.length === 2 && user.bankroll >= userHand.bet;
-        const canSplit = userHand.cards.length === 2 && userHand.info.isPair && user.bankroll >= userHand.bet && user.hands.length < 4;
+      if (isUserTurn && user) {
+        const userHand = user.hands[gameEngine.activeHandIndex] || user.hands[0];
+        const canDouble = userHand && userHand.cards.length === 2 && user.bankroll >= userHand.bet;
+        const canSplit = userHand && userHand.cards.length === 2 && userHand.info.isPair && user.bankroll >= userHand.bet && user.hands.length < 4;
 
         if (btnHit) btnHit.disabled = false;
         if (btnStand) btnStand.disabled = false;
@@ -384,7 +424,7 @@ export class UIController {
         if (btnSplit) btnSplit.disabled = !canSplit;
 
         // Strategy Advisor
-        if (this.toggles.strategyHints) {
+        if (this.toggles.strategyHints && userHand && gameEngine.dealer.cards[0]) {
           const optimal = getOptimalStrategy(userHand.cards, gameEngine.dealer.cards[0], gameEngine.shoe.getTrueCount(), canDouble, canSplit);
           strategyAdvisor.classList.remove('hidden');
 
@@ -402,7 +442,7 @@ export class UIController {
           strategyAdvisor.classList.add('hidden');
         }
       } else {
-        // Disabled while AI or Dealer plays
+        // Disabled while other player, AI or Dealer plays
         if (btnHit) btnHit.disabled = true;
         if (btnStand) btnStand.disabled = true;
         if (btnDouble) btnDouble.disabled = true;
@@ -415,8 +455,22 @@ export class UIController {
 
     // Round Over / New Hand button
     const newRoundBar = document.getElementById('round-over-bar');
+    const btnNewRound = document.getElementById('btn-new-round');
     if (gameEngine.phase === 'ROUND_OVER') {
       newRoundBar.classList.remove('hidden');
+      if (isClient) {
+        if (btnNewRound) {
+          btnNewRound.disabled = true;
+          btnNewRound.innerText = 'WAITING FOR HOST TO START NEXT HAND...';
+          btnNewRound.className = 'w-full py-3 rounded-xl bg-slate-800 text-slate-400 font-bold text-sm cursor-not-allowed border border-slate-700';
+        }
+      } else {
+        if (btnNewRound) {
+          btnNewRound.disabled = false;
+          btnNewRound.innerText = 'START NEXT HAND';
+          btnNewRound.className = 'w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/20 active:scale-98';
+        }
+      }
     } else {
       newRoundBar.classList.add('hidden');
     }
@@ -859,6 +913,216 @@ export class UIController {
         })}</div>
       </div>
     `;
+  }
+
+  // --- Multiplayer Modals & State UI ---
+
+  initMultiplayerModals(callbacks = {}) {
+    const modal = document.getElementById('multiplayer-modal');
+    const btnOpen = document.getElementById('btn-open-multiplayer');
+    const btnClose = document.getElementById('btn-close-multiplayer');
+
+    const tabHost = document.getElementById('mp-tab-host');
+    const tabJoin = document.getElementById('mp-tab-join');
+    const panelHost = document.getElementById('mp-panel-host');
+    const panelJoin = document.getElementById('mp-panel-join');
+
+    const showModal = () => modal && modal.classList.remove('hidden');
+    const hideModal = () => modal && modal.classList.add('hidden');
+
+    if (btnOpen) btnOpen.onclick = showModal;
+    if (btnClose) btnClose.onclick = hideModal;
+
+    const setTab = (tab) => {
+      if (tab === 'host') {
+        if (tabHost) tabHost.className = 'py-2 text-xs font-bold rounded-lg bg-amber-500 text-slate-950 transition shadow';
+        if (tabJoin) tabJoin.className = 'py-2 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition';
+        if (panelHost) panelHost.classList.remove('hidden');
+        if (panelJoin) panelJoin.classList.add('hidden');
+      } else {
+        if (tabJoin) tabJoin.className = 'py-2 text-xs font-bold rounded-lg bg-emerald-600 text-white transition shadow';
+        if (tabHost) tabHost.className = 'py-2 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition';
+        if (panelJoin) panelJoin.classList.remove('hidden');
+        if (panelHost) panelHost.classList.add('hidden');
+      }
+    };
+
+    if (tabHost) tabHost.onclick = () => setTab('host');
+    if (tabJoin) tabJoin.onclick = () => setTab('join');
+
+    // Host Action
+    const btnStartHost = document.getElementById('btn-mp-start-host');
+    if (btnStartHost) {
+      btnStartHost.onclick = () => {
+        const nameInput = document.getElementById('mp-player-name');
+        const avatarSelect = document.getElementById('mp-player-avatar');
+        const name = (nameInput && nameInput.value.trim()) || 'Host';
+        const avatar = (avatarSelect && avatarSelect.value) || '😎';
+        if (callbacks.onHostStart) callbacks.onHostStart(name, avatar);
+      };
+    }
+
+    // Join Action
+    const btnJoinRoom = document.getElementById('btn-mp-join-room');
+    if (btnJoinRoom) {
+      btnJoinRoom.onclick = () => {
+        const codeInput = document.getElementById('mp-input-room-code');
+        const nameInput = document.getElementById('mp-player-name');
+        const avatarSelect = document.getElementById('mp-player-avatar');
+        const code = (codeInput && codeInput.value.trim().toUpperCase()) || '';
+        const name = (nameInput && nameInput.value.trim()) || 'Guest';
+        const avatar = (avatarSelect && avatarSelect.value) || '🤠';
+        if (!code) {
+          alert('Please enter a 5-character Room Code.');
+          return;
+        }
+        if (callbacks.onJoin) callbacks.onJoin(code, name, avatar);
+      };
+    }
+
+    // Copy Code / Link
+    const btnCopyCode = document.getElementById('btn-mp-copy-code');
+    if (btnCopyCode) {
+      btnCopyCode.onclick = () => {
+        const code = document.getElementById('mp-display-room-code')?.innerText.trim();
+        if (code) {
+          navigator.clipboard.writeText(code);
+          btnCopyCode.innerText = '✅ Copied!';
+          setTimeout(() => { btnCopyCode.innerHTML = '<span>📋</span><span>Copy Code</span>'; }, 1500);
+        }
+      };
+    }
+
+    const btnCopyInvite = document.getElementById('btn-mp-copy-invite');
+    if (btnCopyInvite) {
+      btnCopyInvite.onclick = () => {
+        const code = document.getElementById('mp-display-room-code')?.innerText.trim();
+        if (code) {
+          const url = `${window.location.origin}${window.location.pathname}?room=${code}`;
+          navigator.clipboard.writeText(url);
+          btnCopyInvite.innerText = '✅ Link Copied!';
+          setTimeout(() => { btnCopyInvite.innerHTML = '<span>🔗</span><span>Copy Direct Link</span>'; }, 1500);
+        }
+      };
+    }
+
+    const btnBarCopyLink = document.getElementById('btn-mp-copy-link');
+    if (btnBarCopyLink) {
+      btnBarCopyLink.onclick = () => {
+        const codeEl = document.getElementById('mp-bar-room-code');
+        const code = codeEl ? codeEl.innerText.trim() : '';
+        if (code) {
+          const url = `${window.location.origin}${window.location.pathname}?room=${code}`;
+          navigator.clipboard.writeText(url);
+          btnBarCopyLink.innerText = '✅ Copied!';
+          setTimeout(() => { btnBarCopyLink.innerHTML = '<span>📋</span><span>Invite Link</span>'; }, 1500);
+        }
+      };
+    }
+
+    // Leave / End buttons
+    const btnEndHost = document.getElementById('btn-mp-end-host');
+    if (btnEndHost) btnEndHost.onclick = () => callbacks.onDisconnect && callbacks.onDisconnect();
+
+    const btnLeaveRoom = document.getElementById('btn-mp-leave-room');
+    if (btnLeaveRoom) btnLeaveRoom.onclick = () => callbacks.onDisconnect && callbacks.onDisconnect();
+
+    const btnBarLeave = document.getElementById('btn-mp-leave');
+    if (btnBarLeave) btnBarLeave.onclick = () => callbacks.onDisconnect && callbacks.onDisconnect();
+
+    // Reaction Buttons
+    const reactionBtns = document.querySelectorAll('.btn-send-reaction');
+    reactionBtns.forEach(btn => {
+      btn.onclick = () => {
+        const emoji = btn.dataset.emoji;
+        if (callbacks.onSendReaction) callbacks.onSendReaction(emoji);
+      };
+    });
+
+    this.showMultiplayerModal = showModal;
+    this.hideMultiplayerModal = hideModal;
+    this.setMultiplayerTab = setTab;
+  }
+
+  updateMultiplayerStatus(info) {
+    const statusBadge = document.getElementById('multiplayer-status-badge');
+    const activeBar = document.getElementById('multiplayer-active-bar');
+    const barCode = document.getElementById('mp-bar-room-code');
+    const barRole = document.getElementById('mp-bar-role-badge');
+    const barPeers = document.getElementById('mp-bar-peers-count');
+
+    const hostIdle = document.getElementById('mp-host-idle-state');
+    const hostActive = document.getElementById('mp-host-active-state');
+    const joinIdle = document.getElementById('mp-join-idle-state');
+    const clientActive = document.getElementById('mp-client-active-state');
+
+    const dispRoomCode = document.getElementById('mp-display-room-code');
+    const clientRoomCode = document.getElementById('mp-client-room-code');
+    const clientSeatInfo = document.getElementById('mp-client-seat-info');
+
+    if (!info || info.role === 'SOLO') {
+      if (statusBadge) statusBadge.className = 'w-2 h-2 rounded-full bg-slate-500 inline-block';
+      if (activeBar) activeBar.classList.add('hidden');
+      if (hostIdle) hostIdle.classList.remove('hidden');
+      if (hostActive) hostActive.classList.add('hidden');
+      if (joinIdle) joinIdle.classList.remove('hidden');
+      if (clientActive) clientActive.classList.add('hidden');
+      return;
+    }
+
+    if (statusBadge) statusBadge.className = 'w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse';
+    if (activeBar) activeBar.classList.remove('hidden');
+
+    if (info.role === 'HOST') {
+      if (barCode) barCode.innerText = info.roomCode;
+      if (barRole) {
+        barRole.innerText = 'HOST';
+        barRole.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 uppercase';
+      }
+      const count = (info.connectedPeers || 0) + 1;
+      if (barPeers) barPeers.innerText = `(${count} player${count > 1 ? 's' : ''})`;
+
+      if (hostIdle) hostIdle.classList.add('hidden');
+      if (hostActive) hostActive.classList.remove('hidden');
+      if (dispRoomCode) dispRoomCode.innerText = info.roomCode;
+
+      const seatsCountEl = document.getElementById('mp-host-seats-count');
+      if (seatsCountEl) seatsCountEl.innerText = `${count} / 5 seats`;
+    } else if (info.role === 'CLIENT') {
+      if (barCode) barCode.innerText = info.roomCode;
+      if (barRole) {
+        barRole.innerText = 'GUEST';
+        barRole.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 uppercase';
+      }
+      if (barPeers) barPeers.innerText = '(P2P Connected)';
+
+      if (joinIdle) joinIdle.classList.add('hidden');
+      if (clientActive) clientActive.classList.remove('hidden');
+      if (clientRoomCode) clientRoomCode.innerText = info.roomCode;
+      if (clientSeatInfo && info.assignedSeatIndex !== undefined) {
+        clientSeatInfo.innerHTML = `Assigned Seat: <strong class="text-emerald-400 font-bold">Seat #${info.assignedSeatIndex + 1}</strong>`;
+      }
+    }
+  }
+
+  showFloatingReaction(seatIndex, emoji) {
+    let seatEl = document.getElementById(`seat-container-${seatIndex}`);
+    if (!seatEl && seatIndex === 'host') {
+      seatEl = document.getElementById('seat-container-0');
+    }
+    if (!seatEl) return;
+
+    const floatEl = document.createElement('div');
+    floatEl.className = 'absolute -top-10 text-3xl z-40 pointer-events-none transition-all duration-700 ease-out select-none';
+    floatEl.style.transform = 'translateY(0) scale(1)';
+    floatEl.innerText = emoji;
+    seatEl.appendChild(floatEl);
+
+    requestAnimationFrame(() => {
+      floatEl.style.transform = 'translateY(-35px) scale(1.6)';
+      floatEl.style.opacity = '0';
+    });
+    setTimeout(() => floatEl.remove(), 750);
   }
 }
 

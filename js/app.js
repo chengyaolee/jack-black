@@ -1,5 +1,6 @@
 import { BlackjackGame } from './game.js';
 import { PracticeEngine } from './practice.js';
+import { MultiplayerEngine } from './multiplayer.js';
 import { ui } from './ui.js';
 import { sound } from './audio.js';
 
@@ -10,6 +11,8 @@ class App {
   constructor() {
     this.game = null;
     this.practice = null;
+    this.multiplayer = null;
+    this.lastGameState = null;
   }
 
   init() {
@@ -21,6 +24,7 @@ class App {
       userSeatIndex: 1, // center seat in 3-seat table
       aiDelta: 0.0,
       onStateChange: (phase, data) => {
+        this.lastGameState = data;
         ui.renderGameTable(data, this.game);
       },
       onMessage: (msg) => {
@@ -55,12 +59,160 @@ class App {
       }
     });
 
+    // 3. Initialize Multiplayer Engine (WebRTC P2P)
+    this.multiplayer = new MultiplayerEngine({
+      onStatusChange: (status) => {
+        ui.updateMultiplayerStatus(status);
+        if (status.status === 'HOSTING') {
+          this.showToastNotification(`Room created! Code: ${status.roomCode}`, 'info');
+        } else if (status.status === 'CONNECTED_AS_GUEST') {
+          this.showToastNotification(`Joined Room ${status.roomCode}!`, 'info');
+        } else if (status.status === 'SOLO') {
+          this.showToastNotification('Switched to Solo play', 'info');
+        }
+      },
+      onRemoteAction: ({ peerId, action }) => {
+        if (this.multiplayer.isHost()) {
+          this.game.handleRemoteAction(peerId, action);
+        }
+      },
+      onRemoteBet: ({ peerId, amount }) => {
+        if (this.multiplayer.isHost()) {
+          this.game.handleRemoteBet(peerId, amount);
+        }
+      },
+      onRemoteInsurance: ({ peerId, take }) => {
+        if (this.multiplayer.isHost()) {
+          this.game.handleRemoteInsurance(peerId, take);
+        }
+      },
+      onPlayerJoined: ({ peerId, name, avatar }) => {
+        if (this.multiplayer.isHost()) {
+          const seatIdx = this.game.assignPlayerToSeat(peerId, name, avatar);
+          if (seatIdx !== -1) {
+            this.showToastNotification(`${avatar} ${name} joined table!`, 'info');
+            // Send WELCOME packet to client with their seat index and initial state
+            this.multiplayer.sendToClient(peerId, {
+              type: 'WELCOME',
+              seatIndex: seatIdx,
+              tableName: 'Vegas 6-Deck Table',
+              initialState: {
+                dealer: this.game.dealer,
+                seats: this.game.seats,
+                activeSeatIndex: this.game.activeSeatIndex,
+                activeHandIndex: this.game.activeHandIndex,
+                phase: this.game.phase,
+                shoe: {
+                  cardsLeft: this.game.shoe.getCardsRemaining(),
+                  totalCards: this.game.shoe.getTotalCards(),
+                  runningCount: this.game.shoe.runningCount,
+                  decksRemaining: this.game.shoe.getDecksRemaining(),
+                  trueCount: this.game.shoe.getTrueCount(),
+                  penetration: this.game.shoe.getPenetrationPercentage(),
+                  cutCardReached: this.game.shoe.needsReshuffle
+                }
+              }
+            });
+            ui.updateMultiplayerStatus({
+              role: 'HOST',
+              roomCode: this.multiplayer.roomCode,
+              connectedPeers: this.multiplayer.clientConnections.size
+            });
+          } else {
+            this.multiplayer.sendToClient(peerId, { type: 'ROOM_FULL' });
+          }
+        }
+      },
+      onPlayerLeft: ({ peerId }) => {
+        if (this.multiplayer.isHost()) {
+          this.game.removePlayerFromSeat(peerId);
+          this.showToastNotification('A player left the table', 'warning');
+          ui.updateMultiplayerStatus({
+            role: 'HOST',
+            roomCode: this.multiplayer.roomCode,
+            connectedPeers: this.multiplayer.clientConnections.size
+          });
+        }
+      },
+      onStateSync: (state, assignedSeatIndex) => {
+        if (this.multiplayer.isClient()) {
+          this.lastGameState = state;
+          this.game.phase = state.phase;
+          this.game.dealer = state.dealer;
+          this.game.seats = state.seats;
+          this.game.activeSeatIndex = state.activeSeatIndex;
+          this.game.activeHandIndex = state.activeHandIndex;
+          this.game.shoe.runningCount = state.shoe.runningCount;
+          ui.renderGameTable(state, this.game);
+        }
+      },
+      onReaction: ({ peerId, emoji }) => {
+        let seatIdx = 0;
+        if (peerId === 'host') {
+          seatIdx = 0;
+        } else {
+          const seat = this.game.seats.find(s => s.peerId === peerId);
+          seatIdx = seat ? seat.index : 0;
+        }
+        ui.showFloatingReaction(seatIdx, emoji);
+      },
+      onError: (errMsg) => {
+        this.showToastNotification(errMsg, 'warning');
+      }
+    });
+
+    this.game.multiplayer = this.multiplayer;
+
+    // Connect game broadcast to multiplayer host
+    this.game.onBroadcast = (state) => {
+      if (this.multiplayer.isHost()) {
+        this.multiplayer.broadcastState(state);
+      }
+    };
+
+    // Wire Multiplayer UI Modals
+    ui.initMultiplayerModals({
+      onHostStart: (name, avatar) => {
+        this.multiplayer.startHosting(null, name, avatar);
+      },
+      onJoin: (roomCode, name, avatar) => {
+        this.multiplayer.joinRoom(roomCode, name, avatar);
+      },
+      onDisconnect: () => {
+        this.multiplayer.disconnect();
+        ui.renderGameTable(this.lastGameState || this.game, this.game);
+      },
+      onSendReaction: (emoji) => {
+        this.multiplayer.sendReaction(emoji);
+        const mySeat = this.multiplayer.isClient() ? this.multiplayer.assignedSeatIndex : 0;
+        ui.showFloatingReaction(mySeat, emoji);
+      }
+    });
+
     this.bindDOMEvents();
     this.bindKeyboardShortcuts();
+
+    // Check URL query parameters for direct invite link: ?room=CODE
+    this.checkUrlForRoomCode();
 
     // Initial render
     ui.setMode('game');
     this.game.notifyUpdate();
+  }
+
+  checkUrlForRoomCode() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const room = params.get('room');
+      if (room) {
+        ui.showMultiplayerModal();
+        ui.setMultiplayerTab('join');
+        const codeInput = document.getElementById('mp-input-room-code');
+        if (codeInput) {
+          codeInput.value = room.toUpperCase();
+        }
+      }
+    } catch (e) {}
   }
 
   bindDOMEvents() {
@@ -68,7 +220,6 @@ class App {
     document.getElementById('tab-game').onclick = () => ui.setMode('game');
     document.getElementById('tab-practice').onclick = () => {
       ui.setMode('practice');
-      // If practice idle, show prompt to start
     };
 
     // AI Delta Slider
@@ -98,6 +249,10 @@ class App {
     const seatButtons = document.querySelectorAll('.btn-seat-count');
     seatButtons.forEach(btn => {
       btn.onclick = () => {
+        if (this.multiplayer.isClient()) {
+          this.showToastNotification('Seat count is managed by the host in multiplayer', 'info');
+          return;
+        }
         const count = parseInt(btn.dataset.seats, 10);
         seatButtons.forEach(b => b.classList.remove('bg-amber-500', 'text-slate-950', 'font-bold'));
         btn.classList.add('bg-amber-500', 'text-slate-950', 'font-bold');
@@ -110,39 +265,124 @@ class App {
     chipBtns.forEach(btn => {
       btn.onclick = () => {
         const val = parseInt(btn.dataset.value, 10);
-        this.game.addUserChip(val);
+        if (this.multiplayer.isClient()) {
+          const seat = this.game.seats[this.multiplayer.assignedSeatIndex];
+          if (seat && this.game.phase === 'BETTING') {
+            const newBet = Math.min(seat.bankroll, Math.min(this.game.maxBet, seat.currentBet + val));
+            seat.currentBet = newBet;
+            if (seat.hands[0]) seat.hands[0].bet = newBet;
+            this.multiplayer.sendBet(newBet);
+            sound.playChipClink();
+            const curBetDisplay = document.getElementById('user-current-bet-display');
+            if (curBetDisplay) curBetDisplay.innerText = `$${newBet}`;
+          }
+        } else {
+          this.game.addUserChip(val);
+        }
       };
     });
 
     // Bet controls
-    document.getElementById('btn-clear-bet').onclick = () => this.game.clearUserBet();
+    document.getElementById('btn-clear-bet').onclick = () => {
+      if (this.multiplayer.isClient()) {
+        const seat = this.game.seats[this.multiplayer.assignedSeatIndex];
+        if (seat && this.game.phase === 'BETTING') {
+          seat.currentBet = this.game.minBet;
+          if (seat.hands[0]) seat.hands[0].bet = this.game.minBet;
+          this.multiplayer.sendBet(this.game.minBet);
+          sound.playChipClink();
+          const curBetDisplay = document.getElementById('user-current-bet-display');
+          if (curBetDisplay) curBetDisplay.innerText = `$${this.game.minBet}`;
+        }
+      } else {
+        this.game.clearUserBet();
+      }
+    };
+
     document.getElementById('btn-double-bet').onclick = () => {
-      const user = this.game.getUserSeat();
-      if (user) this.game.setUserBet(user.currentBet * 2);
+      if (this.multiplayer.isClient()) {
+        const seat = this.game.seats[this.multiplayer.assignedSeatIndex];
+        if (seat && this.game.phase === 'BETTING') {
+          const newBet = Math.min(seat.bankroll, Math.min(this.game.maxBet, seat.currentBet * 2));
+          seat.currentBet = newBet;
+          if (seat.hands[0]) seat.hands[0].bet = newBet;
+          this.multiplayer.sendBet(newBet);
+          sound.playChipClink();
+          const curBetDisplay = document.getElementById('user-current-bet-display');
+          if (curBetDisplay) curBetDisplay.innerText = `$${newBet}`;
+        }
+      } else {
+        const user = this.game.getUserSeat();
+        if (user) this.game.setUserBet(user.currentBet * 2);
+      }
     };
 
     // Deal Button
     const btnDeal = document.getElementById('btn-deal-cards');
     if (btnDeal) {
-      btnDeal.onclick = () => this.game.startDeal();
+      btnDeal.onclick = () => {
+        if (this.multiplayer.isClient()) {
+          this.showToastNotification('The Host deals the cards for the table', 'info');
+          return;
+        }
+        this.game.startDeal();
+      };
     }
 
     // Action buttons
-    document.getElementById('btn-action-hit').onclick = () => this.game.userHit();
-    document.getElementById('btn-action-stand').onclick = () => this.game.userStand();
-    document.getElementById('btn-action-double').onclick = () => this.game.userDouble();
-    document.getElementById('btn-action-split').onclick = () => this.game.userSplit();
+    document.getElementById('btn-action-hit').onclick = () => {
+      if (this.multiplayer.isClient()) {
+        this.multiplayer.sendAction('HIT');
+      } else {
+        this.game.userHit();
+      }
+    };
+    document.getElementById('btn-action-stand').onclick = () => {
+      if (this.multiplayer.isClient()) {
+        this.multiplayer.sendAction('STAND');
+      } else {
+        this.game.userStand();
+      }
+    };
+    document.getElementById('btn-action-double').onclick = () => {
+      if (this.multiplayer.isClient()) {
+        this.multiplayer.sendAction('DOUBLE');
+      } else {
+        this.game.userDouble();
+      }
+    };
+    document.getElementById('btn-action-split').onclick = () => {
+      if (this.multiplayer.isClient()) {
+        this.multiplayer.sendAction('SPLIT');
+      } else {
+        this.game.userSplit();
+      }
+    };
 
     // Insurance Modal buttons
     document.getElementById('btn-insurance-yes').onclick = () => {
-      this.game.resolveInsuranceDecision(true);
+      if (this.multiplayer.isClient()) {
+        this.multiplayer.sendInsurance(true);
+        document.getElementById('insurance-modal')?.classList.add('hidden');
+      } else {
+        this.game.resolveInsuranceDecision(true);
+      }
     };
     document.getElementById('btn-insurance-no').onclick = () => {
-      this.game.resolveInsuranceDecision(false);
+      if (this.multiplayer.isClient()) {
+        this.multiplayer.sendInsurance(false);
+        document.getElementById('insurance-modal')?.classList.add('hidden');
+      } else {
+        this.game.resolveInsuranceDecision(false);
+      }
     };
 
     // Round Over / New Hand button
     document.getElementById('btn-new-round').onclick = () => {
+      if (this.multiplayer.isClient()) {
+        this.showToastNotification('Waiting for host to start the next hand', 'info');
+        return;
+      }
       this.game.readyNextBettingPhase();
     };
 
@@ -233,27 +473,34 @@ class App {
         if (this.game.phase === 'BETTING') {
           if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault();
-            this.game.startDeal();
+            if (!this.multiplayer.isClient()) {
+              this.game.startDeal();
+            }
           }
         } else if (this.game.phase === 'PLAYING') {
           if (key === 'H') {
-            this.game.userHit();
+            if (this.multiplayer.isClient()) this.multiplayer.sendAction('HIT');
+            else this.game.userHit();
           } else if (key === 'S' || e.key === ' ') {
             e.preventDefault();
-            this.game.userStand();
+            if (this.multiplayer.isClient()) this.multiplayer.sendAction('STAND');
+            else this.game.userStand();
           } else if (key === 'D') {
-            this.game.userDouble();
+            if (this.multiplayer.isClient()) this.multiplayer.sendAction('DOUBLE');
+            else this.game.userDouble();
           } else if (key === 'P') {
-            this.game.userSplit();
+            if (this.multiplayer.isClient()) this.multiplayer.sendAction('SPLIT');
+            else this.game.userSplit();
           }
         } else if (this.game.phase === 'ROUND_OVER') {
           if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault();
-            this.game.readyNextBettingPhase();
+            if (!this.multiplayer.isClient()) {
+              this.game.readyNextBettingPhase();
+            }
           }
         }
       } else if (ui.currentMode === 'practice') {
-        // Practice numpad keyboard handling
         const questionModal = document.getElementById('practice-question-modal');
         if (questionModal && !questionModal.classList.contains('hidden')) {
           if (e.key >= '0' && e.key <= '9') {

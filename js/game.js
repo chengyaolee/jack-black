@@ -40,6 +40,7 @@ export class BlackjackGame {
     this.onSeatUpdate = options.onSeatUpdate || (() => {});
     this.onDealerUpdate = options.onDealerUpdate || (() => {});
     this.onMessage = options.onMessage || (() => {});
+    this.onBroadcast = options.onBroadcast || null;
 
     this.initSeats();
   }
@@ -55,6 +56,8 @@ export class BlackjackGame {
       this.seats.push({
         index: i,
         isUser,
+        isRemote: false,
+        peerId: null,
         name: isUser ? 'You' : bot.name,
         avatar: isUser ? '😎' : bot.avatar,
         tag: isUser ? 'Player' : bot.tag,
@@ -182,8 +185,12 @@ export class BlackjackGame {
     // Deduct bets from players
     for (const seat of this.seats) {
       // AI bets based on count and delta
-      if (!seat.isUser) {
+      if (!seat.isUser && !seat.isRemote) {
         seat.currentBet = this.calculateAiBet(seat);
+      }
+      if (seat.bankroll < this.minBet) {
+        seat.bankroll = 1000;
+        seat.currentBet = this.minBet;
       }
       seat.bankroll -= seat.currentBet;
       if (seat.isUser) this.saveBankroll(seat.bankroll);
@@ -295,7 +302,7 @@ export class BlackjackGame {
   async handleInsurancePhase() {
     // If user has enough bankroll, wait for user input; AI makes insurance decisions automatically
     for (const seat of this.seats) {
-      if (!seat.isUser) {
+      if (!seat.isUser && !seat.isRemote) {
         const tc = this.shoe.getTrueCount().floored;
         // Basic strategy: decline insurance. Illustrious 18: take insurance if TC >= +3
         const takesInsurance = (Math.random() > this.aiDelta) ? (tc >= 3) : (Math.random() < 0.4);
@@ -391,8 +398,8 @@ export class BlackjackGame {
       return;
     }
 
-    if (currentSeat.isUser) {
-      // Wait for user action via UI buttons
+    if (currentSeat.isUser || currentSeat.isRemote) {
+      // Wait for player action (local UI buttons or WebRTC network action)
       this.notifyUpdate();
       return;
     }
@@ -744,12 +751,156 @@ export class BlackjackGame {
     this.notifyUpdate();
   }
 
+  // Remote Multiplayer Helpers
+  findOpenSeat() {
+    // First look for any existing AI seat
+    for (let i = 0; i < this.seats.length; i++) {
+      if (!this.seats[i].isUser && !this.seats[i].isRemote) {
+        return i;
+      }
+    }
+    // If table has fewer than 5 seats, we can expand by 1
+    if (this.seats.length < 5) {
+      const newIndex = this.seats.length;
+      this.tableSeatsCount = newIndex + 1;
+      const bot = AI_BOT_PROFILES[newIndex % AI_BOT_PROFILES.length];
+      this.seats.push({
+        index: newIndex,
+        isUser: false,
+        isRemote: false,
+        peerId: null,
+        name: bot.name,
+        avatar: bot.avatar,
+        tag: bot.tag,
+        bankroll: 1000,
+        currentBet: this.minBet,
+        insuranceBet: 0,
+        hands: [
+          {
+            cards: [],
+            info: { total: 0, isBust: false, isBlackjack: false, isSoft: false, isPair: false },
+            status: 'WAITING',
+            bet: this.minBet,
+            isSplitHand: false,
+            doubled: false
+          }
+        ],
+        lastAction: null,
+        speechBubble: null
+      });
+      return newIndex;
+    }
+    return -1;
+  }
+
+  assignPlayerToSeat(peerId, name = 'Player', avatar = '🤠') {
+    const seatIdx = this.findOpenSeat();
+    if (seatIdx === -1) return -1;
+
+    const seat = this.seats[seatIdx];
+    seat.isRemote = true;
+    seat.isUser = false;
+    seat.peerId = peerId;
+    seat.name = name;
+    seat.avatar = avatar;
+    seat.tag = 'Guest';
+    seat.bankroll = 1000;
+    seat.currentBet = this.minBet;
+    seat.hands[0].bet = this.minBet;
+    seat.speechBubble = 'Joined table!';
+    this.notifyUpdate();
+    return seatIdx;
+  }
+
+  removePlayerFromSeat(peerId) {
+    const seat = this.seats.find(s => s.peerId === peerId);
+    if (!seat) return;
+
+    const bot = AI_BOT_PROFILES[seat.index % AI_BOT_PROFILES.length];
+    seat.isRemote = false;
+    seat.isUser = false;
+    seat.peerId = null;
+    seat.name = bot.name;
+    seat.avatar = bot.avatar;
+    seat.tag = bot.tag;
+    seat.bankroll = 1000;
+    seat.speechBubble = 'Left table';
+    this.notifyUpdate();
+  }
+
+  handleRemoteBet(peerId, amount) {
+    if (this.phase !== 'BETTING') return;
+    const seat = this.seats.find(s => s.peerId === peerId);
+    if (!seat) return;
+
+    const bet = Math.max(this.minBet, Math.min(seat.bankroll, Math.min(this.maxBet, amount)));
+    seat.currentBet = bet;
+    seat.hands[0].bet = bet;
+    sound.playChipClink();
+    this.notifyUpdate();
+  }
+
+  handleRemoteInsurance(peerId, take) {
+    if (this.phase !== 'INSURANCE') return;
+    const seat = this.seats.find(s => s.peerId === peerId);
+    if (!seat) return;
+
+    if (take && seat.bankroll >= Math.floor(seat.currentBet / 2)) {
+      const insAmount = Math.floor(seat.currentBet / 2);
+      seat.bankroll -= insAmount;
+      seat.insuranceBet = insAmount;
+      seat.speechBubble = 'Took Insurance!';
+    } else {
+      seat.speechBubble = 'Declined Insurance';
+    }
+    this.notifyUpdate();
+  }
+
+  handleRemoteAction(peerId, action) {
+    if (this.phase !== 'PLAYING') return;
+    const seat = this.seats[this.activeSeatIndex];
+    if (!seat || seat.peerId !== peerId) return;
+
+    const hand = seat.hands[this.activeHandIndex];
+    if (!hand || hand.status !== 'ACTIVE') return;
+
+    const upperAction = (action || '').toUpperCase();
+    if (upperAction === 'HIT') {
+      seat.lastAction = 'Hit';
+      seat.speechBubble = 'Hit';
+      this.executeHit(seat, hand);
+      this.notifyUpdate();
+      if (hand.status !== 'ACTIVE' || hand.info.total >= 21) {
+        setTimeout(() => this.advanceToNextHandOrSeat(), 400);
+      }
+    } else if (upperAction === 'STAND') {
+      seat.lastAction = 'Stand';
+      this.executeStand(seat, hand);
+      this.notifyUpdate();
+      setTimeout(() => this.advanceToNextHandOrSeat(), 300);
+    } else if (upperAction === 'DOUBLE') {
+      if (hand.cards.length === 2 && seat.bankroll >= hand.bet) {
+        seat.lastAction = 'Double Down';
+        this.executeDouble(seat, hand);
+        this.notifyUpdate();
+        setTimeout(() => this.advanceToNextHandOrSeat(), 500);
+      }
+    } else if (upperAction === 'SPLIT') {
+      if (hand.cards.length === 2 && hand.info.isPair && seat.bankroll >= hand.bet && seat.hands.length < 4) {
+        seat.lastAction = 'Split';
+        this.executeSplit(seat, hand);
+        this.notifyUpdate();
+      }
+    }
+  }
+
   notifyUpdate() {
-    this.onStateChange(this.phase, {
+    const data = {
       dealer: this.dealer,
       seats: this.seats,
       activeSeatIndex: this.activeSeatIndex,
       activeHandIndex: this.activeHandIndex,
+      phase: this.phase,
       shoe: {
         cardsLeft: this.shoe.getCardsRemaining(),
         totalCards: this.shoe.getTotalCards(),
@@ -759,7 +910,11 @@ export class BlackjackGame {
         penetration: this.shoe.getPenetrationPercentage(),
         cutCardReached: this.shoe.needsReshuffle
       }
-    });
+    };
+    this.onStateChange(this.phase, data);
+    if (this.onBroadcast) {
+      this.onBroadcast(data);
+    }
   }
 
   sleep(ms) {
