@@ -170,8 +170,8 @@ export class UIController {
         const seatDiv = document.createElement('div');
         seatDiv.id = `seat-container-${seatIdx}`;
         seatDiv.className = `flex flex-col items-center justify-between p-3 rounded-2xl transition-all duration-300 relative ${
-          isCurrentSeat 
-            ? 'ring-2 ring-amber-400 bg-amber-950/30 scale-105 shadow-xl shadow-amber-500/10' 
+          isCurrentSeat
+            ? 'ring-2 ring-amber-400 bg-amber-950/30 scale-105 shadow-xl shadow-amber-500/10'
             : 'bg-black/30 border border-white/10'
         }`;
         seatDiv.style.minWidth = '160px';
@@ -810,8 +810,8 @@ export class UIController {
     const btnBetHints = document.getElementById('btn-toggle-bet-hints');
     if (btnBetHints) {
       btnBetHints.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
-        this.toggles.bettingHints 
-          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500' 
+        this.toggles.bettingHints
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500'
           : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
       }`;
     }
@@ -819,8 +819,8 @@ export class UIController {
     const btnStratHints = document.getElementById('btn-toggle-strat-hints');
     if (btnStratHints) {
       btnStratHints.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
-        this.toggles.strategyHints 
-          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500' 
+        this.toggles.strategyHints
+          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500'
           : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
       }`;
     }

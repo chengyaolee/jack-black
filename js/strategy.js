@@ -117,14 +117,14 @@ export const BASIC_STRATEGY = {
  * Checks for Illustrious 18 count deviations
  */
 export function checkIllustrious18Deviation(playerInfo, dealerUpcardKey, trueCount) {
-  const tc = trueCount.floored;
-  const tcExact = trueCount.rounded;
+  const tc = typeof trueCount === 'number' ? trueCount : (trueCount && trueCount.floored !== undefined ? trueCount.floored : 0);
+  const tcExact = typeof trueCount === 'number' ? trueCount : (trueCount && trueCount.rounded !== undefined ? trueCount.rounded : tc);
 
   // 1. Insurance: TC >= +3 -> Take Insurance
   // (Handled separately in insurance phase)
 
   // 2. 16 vs 10: Stand if TC >= 0 (normally Hit)
-  if (!playerInfo.isSoft && playerInfo.total === 16 && dealerUpcardKey === '10') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 16 && dealerUpcardKey === '10') {
     if (tc >= 0) {
       return { action: 'S', reason: `Count Deviation: Stand on 16 vs 10 because True Count (${tcExact}) ≥ 0.` };
     }
@@ -132,7 +132,7 @@ export function checkIllustrious18Deviation(playerInfo, dealerUpcardKey, trueCou
   }
 
   // 3. 15 vs 10: Stand if TC >= +4 (normally Hit)
-  if (!playerInfo.isSoft && playerInfo.total === 15 && dealerUpcardKey === '10') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 15 && dealerUpcardKey === '10') {
     if (tc >= 4) {
       return { action: 'S', reason: `Count Deviation: Stand on 15 vs 10 because True Count (${tcExact}) ≥ +4.` };
     }
@@ -146,21 +146,21 @@ export function checkIllustrious18Deviation(playerInfo, dealerUpcardKey, trueCou
   }
 
   // 5. 10 vs 10: Double if TC >= +4 (normally Hit)
-  if (!playerInfo.isSoft && playerInfo.total === 10 && dealerUpcardKey === '10') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 10 && dealerUpcardKey === '10') {
     if (tc >= 4) {
       return { action: 'D', reason: `Count Deviation: Double 10 vs 10 because True Count (${tcExact}) ≥ +4.` };
     }
   }
 
   // 6. 12 vs 3: Stand if TC >= +2 (normally Hit)
-  if (!playerInfo.isSoft && playerInfo.total === 12 && dealerUpcardKey === '3') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 12 && dealerUpcardKey === '3') {
     if (tc >= 2) {
       return { action: 'S', reason: `Count Deviation: Stand on 12 vs 3 because True Count (${tcExact}) ≥ +2.` };
     }
   }
 
   // 7. 12 vs 2: Stand if TC >= +3 (normally Hit)
-  if (!playerInfo.isSoft && playerInfo.total === 12 && dealerUpcardKey === '2') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 12 && dealerUpcardKey === '2') {
     if (tc >= 3) {
       return { action: 'S', reason: `Count Deviation: Stand on 12 vs 2 because True Count (${tcExact}) ≥ +3.` };
     }
@@ -181,7 +181,7 @@ export function checkIllustrious18Deviation(playerInfo, dealerUpcardKey, trueCou
   }
 
   // 10. 10 vs A: Double if TC >= +4 (normally Hit)
-  if (!playerInfo.isSoft && playerInfo.total === 10 && dealerUpcardKey === 'A') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 10 && dealerUpcardKey === 'A') {
     if (tc >= 4) {
       return { action: 'D', reason: `Count Deviation: Double 10 vs Ace because True Count (${tcExact}) ≥ +4.` };
     }
@@ -195,7 +195,7 @@ export function checkIllustrious18Deviation(playerInfo, dealerUpcardKey, trueCou
   }
 
   // 12. 16 vs 9: Stand if TC >= +5 (normally Hit)
-  if (!playerInfo.isSoft && playerInfo.total === 16 && dealerUpcardKey === '9') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 16 && dealerUpcardKey === '9') {
     if (tc >= 5) {
       return { action: 'S', reason: `Count Deviation: Stand on 16 vs 9 because True Count (${tcExact}) ≥ +5.` };
     }
@@ -209,7 +209,7 @@ export function checkIllustrious18Deviation(playerInfo, dealerUpcardKey, trueCou
   }
 
   // 14. 12 vs 4: Stand if TC >= 0 (Hit if TC <= -1)
-  if (!playerInfo.isSoft && playerInfo.total === 12 && dealerUpcardKey === '4') {
+  if (!playerInfo.isSoft && !playerInfo.isPair && playerInfo.total === 12 && dealerUpcardKey === '4') {
     if (tc <= -1) {
       return { action: 'H', reason: `Negative Count Deviation: Hit 12 vs 4 because True Count (${tcExact}) ≤ -1.` };
     }
@@ -254,7 +254,7 @@ export function getOptimalStrategy(cards, dealerCard, trueCount = { rounded: 0, 
       rawAction = BASIC_STRATEGY.pairs[rankKey][upcardKey] || 'H';
       reason = `Basic Strategy: Pair of ${cards[0].rank}s vs Dealer ${upcardKey}.`;
     }
-  } 
+  }
   // 2. Soft Hands (Ace + X)
   else if (playerInfo.isSoft && cards.length === 2) {
     const nonAceCard = cards[0].rank === 'A' ? cards[1] : cards[0];
@@ -264,7 +264,7 @@ export function getOptimalStrategy(cards, dealerCard, trueCount = { rounded: 0, 
       rawAction = BASIC_STRATEGY.soft[rankNum][upcardKey] || 'H';
       reason = `Basic Strategy: Soft ${playerInfo.total} (A,${nonAceCard.rank}) vs Dealer ${upcardKey}.`;
     }
-  } 
+  }
   // 3. Hard Totals
   else {
     const totalKey = Math.min(21, Math.max(8, playerInfo.total));
@@ -299,8 +299,8 @@ export function getOptimalStrategy(cards, dealerCard, trueCount = { rounded: 0, 
  * Betting Size Advisor based on True Count
  */
 export function getBettingAdvice(trueCount, currentBet, minBet = 10, maxBet = 500) {
-  const tc = trueCount.floored;
-  const tcExact = trueCount.rounded;
+  const tc = typeof trueCount === 'number' ? trueCount : (trueCount && trueCount.floored !== undefined ? trueCount.floored : 0);
+  const tcExact = typeof trueCount === 'number' ? trueCount : (trueCount && trueCount.rounded !== undefined ? trueCount.rounded : tc);
 
   let unitMultiplier = 1;
   let status = 'neutral';

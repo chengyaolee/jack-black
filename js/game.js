@@ -23,7 +23,7 @@ export class BlackjackGame {
 
     this.shoe = new Shoe(this.numDecks);
     this.phase = 'BETTING'; // 'BETTING', 'DEALING', 'INSURANCE', 'PLAYING', 'DEALER_TURN', 'SETTLING', 'ROUND_OVER'
-    
+
     this.dealer = {
       cards: [],
       info: { total: 0, isBust: false, isBlackjack: false, isSoft: false }
@@ -645,7 +645,7 @@ export class BlackjackGame {
     // Dealer draws cards until reaching 17 (or soft 17 if H17 toggle)
     while (true) {
       const info = this.dealer.info;
-      const shouldHit = this.dealerHitsSoft17 
+      const shouldHit = this.dealerHitsSoft17
         ? (info.total < 17 || (info.total === 17 && info.isSoft))
         : (info.total < 17);
 

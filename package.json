@@ -6,7 +6,9 @@
   "main": "index.html",
   "scripts": {
     "start": "npx --yes serve . -l 3000",
-    "dev": "npx --yes serve . -l 3000"
+    "dev": "npx --yes serve . -l 3000",
+    "test": "node --check js/*.js && node test/verify.js",
+    "lint": "node --check js/*.js"
   },
   "keywords": [
     "blackjack",

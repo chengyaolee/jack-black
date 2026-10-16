@@ -17,11 +17,11 @@ export class PracticeEngine {
     this.shoe = new Shoe(6);
     this.currentRound = 0;
     this.state = 'IDLE'; // 'IDLE', 'DEALING', 'AWAITING_INPUT', 'FEEDBACK', 'SESSION_SUMMARY'
-    
+
     this.roundCards = [];
     this.expectedCount = 0;
     this.priorCount = 0;
-    
+
     this.sessionHistory = [];
     this.dealTimer = null;
     this.questionStartTime = 0;
@@ -58,7 +58,7 @@ export class PracticeEngine {
 
     this.currentRound++;
     this.roundCards = [];
-    
+
     if (!this.continuousShoe) {
       this.priorCount = 0;
       this.expectedCount = 0;
@@ -170,7 +170,7 @@ export class PracticeEngine {
 
   finishSession() {
     this.state = 'SESSION_SUMMARY';
-    
+
     const totalScore = this.sessionHistory.reduce((sum, r) => sum + r.points, 0);
     const correctCount = this.sessionHistory.filter(r => r.isCorrect).length;
     const accuracy = Math.round((correctCount / this.sessionHistory.length) * 100) || 0;

@@ -151,22 +151,22 @@ function getFaceCardArt(rank, suit) {
     <g class="face-art">
       <!-- Outer Decorative Tapestry Border -->
       <rect x="36" y="36" width="88" height="152" rx="4" fill="#fafafa" stroke="${gold}" stroke-width="1.5" stroke-dasharray="3,2" />
-      
+
       <!-- Mantle / Robe -->
       <path d="M 45,155 L 45,115 Q 60,105 80,105 Q 100,105 115,115 L 115,155 Z" fill="${mantleColor}" stroke="${strokeColor}" stroke-width="1.5" />
       <path d="M 65,110 L 80,135 L 95,110 Z" fill="${gold}" stroke="${strokeColor}" stroke-width="1.5" />
-      
+
       <!-- Head / Face -->
       <circle cx="80" cy="88" r="15" fill="#fed7aa" stroke="${strokeColor}" stroke-width="1.5" />
-      
+
       <!-- Eyes & Smile -->
       <circle cx="75" cy="85" r="1.5" fill="${strokeColor}" />
       <circle cx="85" cy="85" r="1.5" fill="${strokeColor}" />
       <path d="M 77,93 Q 80,96 83,93" fill="none" stroke="${strokeColor}" stroke-width="1.2" stroke-linecap="round" />
-      
+
       ${crownOrHat}
       ${details}
-      
+
       <!-- Center Emblem Badge -->
       <g transform="translate(80, 142) scale(0.65)" fill="${strokeColor}">
         ${getSuitPath(suit.name.toUpperCase(), 24)}
@@ -251,7 +251,7 @@ export function generateCardFrontSVG(rank, suitKey) {
 
       <!-- Card Base -->
       <rect x="2" y="2" width="156" height="220" rx="10" fill="url(#card-sheen)" stroke="#cbd5e1" stroke-width="1.5" />
-      
+
       <!-- Subtle Inner Border -->
       <rect x="7" y="7" width="146" height="210" rx="7" fill="none" stroke="#f1f5f9" stroke-width="1" />
 
@@ -308,21 +308,21 @@ export function generateCardBackSVG(theme = 'navy') {
 
       <!-- Card Base with White Border -->
       <rect x="2" y="2" width="156" height="220" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
-      
+
       <!-- Pattern Body with Double Inset Gold Border -->
       <rect x="8" y="8" width="144" height="208" rx="6" fill="url(#casino-diamond-${theme})" stroke="${darkColor}" stroke-width="1.5" />
       <rect x="12" y="12" width="136" height="200" rx="4" fill="none" stroke="${goldColor}" stroke-width="1.2" opacity="0.85" />
-      
+
       <!-- Center Casino Medallion -->
       <circle cx="80" cy="112" r="28" fill="${darkColor}" stroke="${goldColor}" stroke-width="2" />
       <circle cx="80" cy="112" r="23" fill="${baseColor}" stroke="${goldColor}" stroke-width="1" stroke-dasharray="2,2" />
-      
+
       <!-- Medallion Spade Logo -->
       <g transform="translate(80, 112) scale(0.85)" fill="${goldColor}">
         <path d="M 0,-14 C -8,-2 -7,7 0,4 C 7,7 8,-2 0,-14 Z" />
         <path d="M 0,3 L -2,12 L 2,12 Z" />
       </g>
-      
+
       <!-- Sheen Overlay -->
       <rect x="2" y="2" width="156" height="220" rx="10" fill="url(#back-sheen-${theme})" pointer-events="none" />
     </svg>
